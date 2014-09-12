@@ -6,6 +6,7 @@
 * Supports multiple listings in a single offer.
 * Automatically rejects any incoming offer from a banned user or tagged scammer.
 * Please note that at this moment, it only supports TF2 offers.
+* Every couple minutes it sends a heartbeat to the backpack.tf server which will change your trade offer button to an automatic trade offer button, alerting users that the items will be available instantly.
 
 ### How do I get set up? ###
 
