@@ -6,14 +6,14 @@
 * Supports multiple listings in a single offer.
 * Automatically rejects any incoming offer from a banned user or tagged scammer.
 * Please note that at this moment, it only supports TF2 offers.
-* Every couple minutes it sends a heartbeat to the backpack.tf server which will change your trade offer button to an automatic trade offer button, alerting users that the items will be available instantly.
+* Every 5 minutes an heartbeat is dispatched to the backpack.tf server. This allows us to identify which users are currently running the bot and switching the trade offer button to an automatic trade offer button.
 
 ### How do I get set up? ###
 
 * Install [Node.js](http://nodejs.org)
 > Windows users, please see the additional requirements for [ursa](https://github.com/Medium/ursa#testing).
 * [Download](https://bitbucket.org/srabouin/backpack.tf-automatic/downloads) the package or clone the repository to a folder of your choice.
-* From the command line, issue *npm install* to install all the required modules. This may take several minutes to run.
+* From the command line, issue *npm install* from the folder you have unpacked / cloned the repository to install all the required modules. This may take several minutes to run.
 > Windows users, please ensure you are running the command prompt as an administrator.
 
 ### Running the application ###
@@ -23,7 +23,7 @@
 
 ### Recommended usage ###
 
-* Place the items you are selling at the beginning of your backpack so they are easier to find, especially if you have multiple identical items and only selling one. backpack.tf relies on the item id, so if the person sending you a trade offer picks the wrong item, the offer will not be automatically accepted as it will not be able to match your item. By placing it at the beginning of your backpack and then listing it you will ensure the proper one is easily accessible.
+* Place the items you are selling at the beginning of your backpack so they are easier to find, especially if you have multiple identical items and only selling one. backpack.tf relies on the item id, so if the person sending you a trade offer picks the wrong item, the offer will not be automatically accepted as it will not be able to match your item. By placing it at the beginning of your backpack and then creating a listing for your item, you will ensure the proper item is easily accessible.
 
 ### Who do I talk to if I run into problems or want to report a bug? ###
 
