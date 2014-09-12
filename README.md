@@ -21,4 +21,4 @@
 
 ### Who do I talk to if I run into problems or want to report a bug? ###
 
-* Please use the issues section of this repo.
+* Please use the [issues](https://bitbucket.org/srabouin/backpack.tf-automatic/issues?status=new&status=open) section of this repo.
