@@ -141,7 +141,6 @@ client.on('sentry', function (sentry) {
 
 client.on('loggedOn', function () {
     logger.info(settings.account.accountName + " is now connected.");
-    client.setPersonaState(Steam.EPersonaState.Online);
     heartbeat();
 });
 
