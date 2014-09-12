@@ -20,6 +20,10 @@
 * Type *node bot.js*.
 * The bot will ask you for your Steam details and your backpack.tf token. You can find your token on your [Settings](http://backpack.tf/settings) page.
 
+### Recommended usage ###
+
+* Place the items you are selling at the beginning of your backpack so they are easier to find, especially if you have multiple identical items and only selling one. backpack.tf relies on the item id, so if the person sending you a trade offer picks the wrong item, the offer will not be automatically accepted as it will not be able to match your item. By placing it at the beginning of your backpack and then listing it you will ensure the proper one is easily accessible.
+
 ### Who do I talk to if I run into problems or want to report a bug? ###
 
 * Please use the [issues](https://bitbucket.org/srabouin/backpack.tf-automatic/issues?status=new&status=open) section of this repo.
