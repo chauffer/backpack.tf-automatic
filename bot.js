@@ -156,7 +156,6 @@ client.on('webSessionID', function (data) {
 
 client.on('tradeOffers', function (count) {
     if (count !== 0) {
-        logger.info("New offers received. Resolving offers.");
         resolveOffers();
     }
 });
