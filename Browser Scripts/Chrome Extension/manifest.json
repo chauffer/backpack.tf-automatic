@@ -1,0 +1,21 @@
+{
+	"manifest_version": 2,
+	"name": "Automatic Steam Trade Offers",
+	"description": "This extension allows to pre-select the seller's item automatically when clicking a trade offer link if an item is specified.",
+	"version": "1",
+	"permissions": [ 
+		"tabs",
+		"*://steamcommunity.com/tradeoffer/new/*"
+	],
+	"icons": {
+		"128": "assets/icon128.png",
+		"16": "assets/icon16.png",
+		"19": "assets/icon19.png",
+		"48": "assets/icon48.png"
+	},
+	"content_scripts": [ {
+		"js": [ "tradeoffer.js" ], 
+		"matches": [ "*://steamcommunity.com/tradeoffer/new/*" ],
+		"run_at": "document_end"
+	} ]
+}
