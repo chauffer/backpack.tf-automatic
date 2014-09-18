@@ -147,10 +147,8 @@ client.on('loggedOn', function () {
 client.on('webSessionID', function (data) {
     var sessionID = data;
     client.webLogOn(function (data) {
-        var cookies = data;
-        offers.setup(sessionID, cookies);
-        //Resolve any offers that were sent when offline.
-        setTimeout(resolveOffers, 2000);
+        offers.setup(sessionID, data);
+        setTimeout(resolveOffers, 2000); //Resolve any offers that were sent when offline.
     });
 });
 
@@ -159,6 +157,14 @@ client.on('tradeOffers', function (count) {
         resolveOffers();
     }
 });
+
+offers.on('error', function(e) {
+	logger.warn('Web cookie expired, refreshing');
+    client.webLogOn(function (data) {
+        offers.setup(sessionID, data);
+    });
+});
+
 
 function resolveOffers() {
     offers.getOffers({
@@ -340,7 +346,7 @@ function processOffer(offer, mybackpack, theirbackpack) {
         };
 
         request(request_params, function (err, data) {
-            if (err) {
+            if (err || !data.body) {
                 logger.warn("[%d] Error reaching backpack.tf, rechecking in 10 seconds...", offer.tradeofferid);
                 setTimeout(function () {
                     processOffer(offer, mybackpack, theirbackpack);
@@ -383,7 +389,7 @@ function processOffer(offer, mybackpack, theirbackpack) {
                             data.body.response.store.length == offer.items_to_give.length // matching number of items
                         )
                     {
-                        if (data.body.response.other.scammer || data.body.response.other.banned) {
+                        if (data.body.response.other && (data.body.response.other.scammer || data.body.response.other.banned)) {
                             logger.warn("[%d] %s is banned, declining trade offer...", offer.tradeofferid, offer.steamid_other);
                             offers.declineOffer(offer.tradeofferid, function () { delete processing[offer.tradeofferid]; });
                         } else {
@@ -451,7 +457,6 @@ function offerAccepted(offer) {
 
     request(request_params, function (err, data) {
         if (err) {
-            logger.warn("Error occurred contacting backpack.tf -- trying again in 60 seconds");
             setTimeout(function () { offerAccepted(offer); }, 60000);
         }
     });
@@ -471,25 +476,27 @@ function heartbeat() {
         };
 
         request(request_params, function (err, data) {
-            if (err) {
+            if (err || !data.body || data.body.success == undefined) {
                 logger.warn("Error occurred contacting backpack.tf -- trying again in 60 seconds");
                 heartbeattimer = setTimeout(function () { heartbeat(); }, 60000);
             } else {
                 if(data.body.success) {
                     // every 5 minutes should be sufficient
                     heartbeattimer = setTimeout(function () { heartbeat(); }, 60000 * 5);
+                    resolveOffers(); // check offers in case we missed a notification
                 } else {
+				    logger.error('Invalid backpack.tf token for this account detected. Please update the token below.')
                     getToken();
                 }
             }
         });
     } else {
+		logger.error('Missing backpack.tf token. Please update the token below.')
         getToken();
     }
 }
 
 function getToken() {
-    logger.error('Invalid backpack.tf token for this account detected. Please update the token below.')
     clearTimeout(heartbeattimer);
     prompt.get({
         properties: {
