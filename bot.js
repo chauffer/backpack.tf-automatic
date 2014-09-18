@@ -483,7 +483,6 @@ function heartbeat() {
                 if(data.body.success) {
                     // every 5 minutes should be sufficient
                     heartbeattimer = setTimeout(function () { heartbeat(); }, 60000 * 5);
-                    resolveOffers(); // check offers in case we missed a notification
                 } else {
 				    logger.error('Invalid backpack.tf token for this account detected. Please update the token below.')
                     getToken();
