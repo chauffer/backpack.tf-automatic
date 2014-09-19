@@ -251,10 +251,13 @@ function processOffer(offer, mybackpack, theirbackpack) {
         myitemids = [],
         isValid = true,
         refined = 0,
-        reclaimed = 0,
-        scrap = 0,
         keys = 0,
-        earbuds = 0;
+        earbuds = 0,
+        mykeys = 0,
+        myrefined = 0,
+        myearbuds = 0,
+        changeitems = 0,
+        itemnames = [];
 
     offer.items_to_give.forEach(function (item, key) {
         mybackpack.forEach(function (inv_item) {
@@ -301,38 +304,46 @@ function processOffer(offer, mybackpack, theirbackpack) {
         });
     });
 
+	myitems.forEach(function (item) {
+		var isChange = true;
+		
+        // these are the only items we give back as change
+        if (item.market_name == 'Refined Metal' && item.app_data.quality == '6')
+            myrefined += 1;
+        else if (item.market_name == 'Reclaimed Metal' && item.app_data.quality == '6')
+            myrefined += 1/3;
+        else if (item.market_name == 'Scrap Metal' && item.app_data.quality == '6')
+            myrefined += 1/9;
+        else
+            isChange = false;
+		
+		if(isChange) 
+			changeitems++;
+			
+		itemnames.push(item.market_name);
+	});
+
     theiritems.forEach(function (item) {
         // we don't want non-craftable or gifted items, unless it's keys, gg valf
         if (item.market_name != 'Mann Co. Supply Crate Key' && (item.craftable == false || item.gifted == true))
             isValid = false;
 
         // these are the only items we accept
-        if (item.market_name == 'Mann Co. Supply Crate Key')
+        if (item.market_name == 'Mann Co. Supply Crate Key' && item.app_data.quality == '6')
             keys++;
-        else if (item.market_name == 'Refined Metal')
+        else if (item.market_name == 'Refined Metal' && item.app_data.quality == '6')
             refined += 1;
-        else if (item.market_name == 'Reclaimed Metal')
-            reclaimed += 1;
-        else if (item.market_name == 'Scrap Metal')
-            scrap += 1;
-        else if (item.market_name == 'Earbuds')
+        else if (item.market_name == 'Reclaimed Metal' && item.app_data.quality == '6')
+            refined += 1/3;
+        else if (item.market_name == 'Scrap Metal' && item.app_data.quality == '6')
+            refined += 1/9;
+        else if (item.market_name == 'Earbuds' && item.app_data.quality == '6')
             earbuds += 1;
         else
             isValid = false;
     });
 
     if (isValid) {
-        while (scrap >= 3) {
-            reclaimed++;
-            scrap -= 3;
-        }
-
-        while (reclaimed >= 3) {
-            refined++;
-            reclaimed -= 3;
-        }
-
-        refined += reclaimed * 0.33 + scrap * 0.11;
 
         var request_params = {
             uri: backpackurl + "/api/IGetUserTrades/v1/",
@@ -353,10 +364,6 @@ function processOffer(offer, mybackpack, theirbackpack) {
                 }, 10000);
             } else {
                 if (data.body.response && data.body.response.success) {
-                    var mykeys = 0,
-                        myrefined = 0,
-                        myearbuds = 0;
-
                     data.body.response.store.forEach(function (item) {
                         for (var index in item.currencies) {
                             if (index == 'keys')
@@ -369,13 +376,14 @@ function processOffer(offer, mybackpack, theirbackpack) {
                         }
                     });
 
-                    myrefined = Math.floor(Math.round(myrefined * 1800) / 18) / 100; // hacky hack
+                    refined = Math.floor(Math.round(refined * 1800) / 18) / 100; // hacky hack i know
+                    myrefined = Math.floor(Math.round(myrefined * 1800) / 18) / 100; 
 
                     var message = "Asked:" +
                         (myearbuds ? " " + myearbuds + " earbud" + (myearbuds != 1 ? "s" : "") : "") +
                         (mykeys ? " " + mykeys + " key" + (mykeys != 1 ? "s" : "") : "") +
                         (myrefined ? " " + myrefined + " refined" : "") +
-                        ". Offered:" +
+                        " (" + itemnames.join() +"). Offered:" +
                         (earbuds ? " " + earbuds + " earbud" + (earbuds != 1 ? "s" : "") : "") +
                         (keys ? " " + keys + " key" + (keys != 1 ? "s" : "") : "") +
                         (refined ? " " + refined + " refined" : "");
@@ -386,7 +394,8 @@ function processOffer(offer, mybackpack, theirbackpack) {
                             myrefined == refined && // matching currencies
                             myearbuds == earbuds &&
                             mykeys == keys &&
-                            data.body.response.store.length == offer.items_to_give.length // matching number of items
+                            data.body.response.store.length && // make sure the person asked for something else than metal
+                            data.body.response.store.length == (offer.items_to_give.length - changeitems) // matching number of items
                         )
                     {
                         if (data.body.response.other && (data.body.response.other.scammer || data.body.response.other.banned)) {
@@ -476,13 +485,13 @@ function heartbeat() {
         };
 
         request(request_params, function (err, data) {
-            if (err || !data.body || data.body.success == undefined) {
+            if (err || !data.body || (typeof data.body.success === 'undefined')) {
                 logger.warn("Error occurred contacting backpack.tf -- trying again in 60 seconds");
-                heartbeattimer = setTimeout(function () { heartbeat(); }, 60000);
+                heartbeattimer = setTimeout(heartbeat, 60000);
             } else {
                 if(data.body.success) {
                     // every 5 minutes should be sufficient
-                    heartbeattimer = setTimeout(function () { heartbeat(); }, 60000 * 5);
+                    heartbeattimer = setTimeout(heartbeat, 60000 * 5);
                 } else {
 				    logger.error('Invalid backpack.tf token for this account detected. Please update the token below.')
                     getToken();
