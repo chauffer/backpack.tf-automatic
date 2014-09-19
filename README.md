@@ -6,6 +6,7 @@
 * Supports multiple listings in a single offer.
 * Automatically rejects any incoming offer from a banned user or tagged scammer.
 * Please note that at this moment, it only supports TF2 offers.
+* The bot will give handle change as part of the trade offer in metal only. If you're asking for 1 key, it will not accept anything else than 1 key. If you're asking 8.33 refined for an item and the buyer offers 9 refined while asking the item + 2 reclaimed metal back, it will process the offer normally.
 * Every 5 minutes an heartbeat is dispatched to the backpack.tf server. This allows us to identify which users are currently running the bot and switching the trade offer button to an automatic trade offer button.
 
 ### How do I get set up? ###
