@@ -220,7 +220,7 @@ function checkOffer(offer) {
         // we only want to deal with TF2 offers
         var valid = offer.items_to_receive.every(function (item) {
             return item.appid == 440;
-        })
+        });
 
         if (valid) {
             logger.info("[%d] Checking offer from %s...", offer.tradeofferid, offer.steamid_other);
