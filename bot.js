@@ -9,6 +9,7 @@ var heartbeattimer;
 var offers = new SteamTradeOffers();
 var client = new Steam.SteamClient();
 
+var sessionID;
 var settings = {};
 var version = "0.1";
 var cookies = null;
@@ -64,24 +65,29 @@ if (fs.existsSync("settings.json")) {
             }
         }
     }, function (err, result) {
-        settings.account = {};
-        settings.account.password = result.password;
-        settings.account.accountName = result.username;
-        settings.account.token = result.token;
+        if (err) {
+            logger.error("Error " + err + " reading Steam details, quitting.");
+            process.exit(1);
+        } else {
+            settings.account = {};
+            settings.account.password = result.password;
+            settings.account.accountName = result.username;
+            settings.account.token = result.token;
 
-        fs.writeFile("settings.json", JSON.stringify(settings, null, 4), function (err) {
-            if (err) {
-                logger.error(err);
-            } else {
-                logger.info("Configuration saved to settings.json.");
-                client.logOn(settings.account);
-            }
-        });
+            fs.writeFile("settings.json", JSON.stringify(settings, null, 4), function (err) {
+                if (err) {
+                    logger.error(err);
+                } else {
+                    logger.info("Configuration saved to settings.json.");
+                    client.logOn(settings.account);
+                }
+            });
+        }
     });
 }
 
 client.on('error', function (e) {
-    if (e.eresult == Steam.EResult.AccountLogonDenied) {
+    if (e.eresult === Steam.EResult.AccountLogonDenied) {
         prompt.get({
             properties: {
                 authcode: {
@@ -91,7 +97,12 @@ client.on('error', function (e) {
                 }
             }
         }, function (err, result) {
-            client.logOn({accountName: settings.account.accountName, password: settings.account.password, authCode: result.authcode});
+            if (err) {
+                logger.error("Error " + err + " getting Steam guard code, quitting.");
+                process.exit(1);
+            } else {
+                client.logOn({accountName: settings.account.accountName, password: settings.account.password, authCode: result.authcode});
+            }
         });
     } else if (e.cause === 'logonFail') {
         logger.warn("Failed to login to Steam.");
@@ -128,6 +139,14 @@ function login() {
     }
 };
 
+function webLogin() {
+    client.webLogOn(function (data) {
+        logger.info('Offer handling ready, checking for offers we may have missed...');
+        offers.setup(sessionID, data);
+        setTimeout(resolveOffers, 2000); //Resolve any offers that were sent when offline.
+    });
+}
+
 client.on('sentry', function (sentry) {
     settings.account.shaSentryfile = sentry.toString('base64');
     fs.writeFile("settings.json", JSON.stringify(settings, null, 4), function (err) {
@@ -145,26 +164,20 @@ client.on('loggedOn', function () {
 });
 
 client.on('webSessionID', function (data) {
-    var sessionID = data;
-    client.webLogOn(function (data) {
-        offers.setup(sessionID, data);
-        setTimeout(resolveOffers, 2000); //Resolve any offers that were sent when offline.
-    });
+    sessionID = data;
+    webLogin();
 });
 
 client.on('tradeOffers', function (count) {
-    if (count !== 0) {
+    logger.info(count + " trade offers pending.");
+    if (count !== 0)
         resolveOffers();
-    }
 });
 
-offers.on('error', function(e) {
-	logger.warn('Web cookie expired, refreshing');
-    client.webLogOn(function (data) {
-        offers.setup(sessionID, data);
-    });
+offers.on('error', function (e) {
+    logger.warn('Web cookie expired, refreshing');
+    webLogin();
 });
-
 
 function resolveOffers() {
     offers.getOffers({
@@ -201,14 +214,13 @@ function checkOffer(offer) {
 
     // we only check offers that involve a complete trade
     if (offer.items_to_give !== undefined && offer.items_to_receive !== undefined) {
-        var valid = true,
-            theirbackpack = [],
+        var theirbackpack = [],
             mybackpack = [];
 
-        offer.items_to_receive.forEach(function (item) {
-            if (item.appid != 440)
-                valid = false;
-        });
+        // we only want to deal with TF2 offers
+        var valid = offer.items_to_receive.every(function (item) {
+            return item.appid == 440;
+        })
 
         if (valid) {
             logger.info("[%d] Checking offer from %s...", offer.tradeofferid, offer.steamid_other);
@@ -236,7 +248,9 @@ function checkOffer(offer) {
             if (!valid) {
                 logger.warn("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Failed to download inventories. Retrying in 5 seconds...");
                 delete processing[offer.tradeofferid];
-                setTimeout(function () { checkOffer(offer); }, 5000);
+                setTimeout(function () {
+                    checkOffer(offer);
+                }, 5000);
                 return;
             }
         } else
@@ -304,24 +318,24 @@ function processOffer(offer, mybackpack, theirbackpack) {
         });
     });
 
-	myitems.forEach(function (item) {
-		var isChange = true;
-		
+    myitems.forEach(function (item) {
+        var isChange = true;
+
         // these are the only items we give back as change
         if (item.market_name == 'Refined Metal' && item.app_data.quality == '6')
             myrefined += 1;
         else if (item.market_name == 'Reclaimed Metal' && item.app_data.quality == '6')
-            myrefined += 1/3;
+            myrefined += 1 / 3;
         else if (item.market_name == 'Scrap Metal' && item.app_data.quality == '6')
-            myrefined += 1/9;
+            myrefined += 1 / 9;
         else
             isChange = false;
-		
-		if(isChange) 
-			changeitems++;
-			
-		itemnames.push(item.market_name);
-	});
+
+        if (isChange)
+            changeitems++;
+
+        itemnames.push(item.market_name);
+    });
 
     theiritems.forEach(function (item) {
         // we don't want non-craftable or gifted items, unless it's keys, gg valf
@@ -334,9 +348,9 @@ function processOffer(offer, mybackpack, theirbackpack) {
         else if (item.market_name == 'Refined Metal' && item.app_data.quality == '6')
             refined += 1;
         else if (item.market_name == 'Reclaimed Metal' && item.app_data.quality == '6')
-            refined += 1/3;
+            refined += 1 / 3;
         else if (item.market_name == 'Scrap Metal' && item.app_data.quality == '6')
-            refined += 1/9;
+            refined += 1 / 9;
         else if (item.market_name == 'Earbuds' && item.app_data.quality == '6')
             earbuds += 1;
         else
@@ -377,13 +391,13 @@ function processOffer(offer, mybackpack, theirbackpack) {
                     });
 
                     refined = Math.floor(Math.round(refined * 1800) / 18) / 100; // hacky hack i know
-                    myrefined = Math.floor(Math.round(myrefined * 1800) / 18) / 100; 
+                    myrefined = Math.floor(Math.round(myrefined * 1800) / 18) / 100;
 
                     var message = "Asked:" +
                         (myearbuds ? " " + myearbuds + " earbud" + (myearbuds != 1 ? "s" : "") : "") +
                         (mykeys ? " " + mykeys + " key" + (mykeys != 1 ? "s" : "") : "") +
                         (myrefined ? " " + myrefined + " refined" : "") +
-                        " (" + itemnames.join() +"). Offered:" +
+                        " (" + itemnames.join(", ") + "). Offered:" +
                         (earbuds ? " " + earbuds + " earbud" + (earbuds != 1 ? "s" : "") : "") +
                         (keys ? " " + keys + " key" + (keys != 1 ? "s" : "") : "") +
                         (refined ? " " + refined + " refined" : "");
@@ -391,16 +405,17 @@ function processOffer(offer, mybackpack, theirbackpack) {
                     logger.info("[%d] %s", offer.tradeofferid, message);
 
                     if (
-                            myrefined == refined && // matching currencies
+                        myrefined == refined && // matching currencies
                             myearbuds == earbuds &&
                             mykeys == keys &&
                             data.body.response.store.length && // make sure the person asked for something else than metal
                             data.body.response.store.length == (offer.items_to_give.length - changeitems) // matching number of items
-                        )
-                    {
+                        ) {
                         if (data.body.response.other && (data.body.response.other.scammer || data.body.response.other.banned)) {
                             logger.warn("[%d] %s is banned, declining trade offer...", offer.tradeofferid, offer.steamid_other);
-                            offers.declineOffer(offer.tradeofferid, function () { delete processing[offer.tradeofferid]; });
+                            offers.declineOffer(offer.tradeofferid, function () {
+                                delete processing[offer.tradeofferid];
+                            });
                         } else {
                             acceptOffer(offer);
                         }
@@ -409,7 +424,9 @@ function processOffer(offer, mybackpack, theirbackpack) {
                     }
                 } else {
                     logger.warn("[%d] Error reaching backpack.tf, rechecking in 10 seconds...", offer.tradeofferid);
-                    setTimeout(function () { processOffer(offer, mybackpack, theirbackpack); }, 10000);
+                    setTimeout(function () {
+                        processOffer(offer, mybackpack, theirbackpack);
+                    }, 10000);
                 }
             }
         });
@@ -421,7 +438,9 @@ function acceptOffer(offer) {
     offers.acceptOffer(offer.tradeofferid, function (err) {
         if (err) {
             logger.warn("[%d] Error occurred whilst accepting - retrying in 10 seconds...", offer.tradeofferid);
-            setTimeout(function () { recheckOffer(offer); }, 10000);
+            setTimeout(function () {
+                recheckOffer(offer);
+            }, 10000);
         } else {
             offerAccepted(offer);
         }
@@ -435,7 +454,9 @@ function recheckOffer(offer) {
     }, function (err, offerhist) {
         if (err) {
             logger.warn("[%d] Error caught when verifying offer, trying again in 10 seconds...", offer.tradeofferid);
-            setTimeout(function () { recheckOffer(offer); }, 10000);
+            setTimeout(function () {
+                recheckOffer(offer);
+            }, 10000);
         } else {
             offer = offerhist.response.offer;
             if (offer.trade_offer_state === TradeOffer.ETradeOfferStateAccepted) {
@@ -466,13 +487,15 @@ function offerAccepted(offer) {
 
     request(request_params, function (err, data) {
         if (err) {
-            setTimeout(function () { offerAccepted(offer); }, 60000);
+            setTimeout(function () {
+                offerAccepted(offer);
+            }, 60000);
         }
     });
 }
 
 function heartbeat() {
-    if(settings.account.token) {
+    if (settings.account.token) {
         var request_params = {
             uri: backpackurl + "/api/IAutomatic/IHeartBeat/",
             form: {
@@ -489,17 +512,17 @@ function heartbeat() {
                 logger.warn("Error occurred contacting backpack.tf -- trying again in 60 seconds");
                 heartbeattimer = setTimeout(heartbeat, 60000);
             } else {
-                if(data.body.success) {
+                if (data.body.success) {
                     // every 5 minutes should be sufficient
                     heartbeattimer = setTimeout(heartbeat, 60000 * 5);
                 } else {
-				    logger.error('Invalid backpack.tf token for this account detected. Please update the token below.')
+                    logger.error('Invalid backpack.tf token for this account detected. Please update the token below.')
                     getToken();
                 }
             }
         });
     } else {
-		logger.error('Missing backpack.tf token. Please update the token below.')
+        logger.error('Missing backpack.tf token. Please update the token below.')
         getToken();
     }
 }
@@ -515,15 +538,20 @@ function getToken() {
             }
         }
     }, function (err, result) {
-        settings.account.token = result.token;
+        if (err) {
+            logger.error("Error " + err + " reading token.");
+            process.exit(1);
+        } else {
+            settings.account.token = result.token;
 
-        fs.writeFile("settings.json", JSON.stringify(settings, null, 4), function (err) {
-            if (err) {
-                logger.error(err);
-            } else {
-                logger.info("Token saved to settings.json.");
-                heartbeat();
-            }
-        });
+            fs.writeFile("settings.json", JSON.stringify(settings, null, 4), function (err) {
+                if (err) {
+                    logger.error(err);
+                } else {
+                    logger.info("Token saved to settings.json.");
+                    heartbeat();
+                }
+            });
+        }
     });
 }
