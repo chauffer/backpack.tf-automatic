@@ -4,14 +4,13 @@ var prompt = require("prompt");
 var winston = require('winston');
 var Steam = require('steam');
 var SteamTradeOffers = require('steam-tradeoffers');
-var heartbeattimer;
 
 var offers = new SteamTradeOffers();
 var client = new Steam.SteamClient();
 
+var heartbeattimer;
 var sessionID;
 var settings = {};
-var version = "0.1";
 var cookies = null;
 var sessionID = null;
 var logintimer = 0;
@@ -29,17 +28,30 @@ TradeOffer = {
     ETradeOfferStateInvalidItems: 8
 };
 
+ItemQualities = {
+    Unique: "6"
+}
+
+if (fs.existsSync("package.json")) {
+    appinfo = JSON.parse(fs.readFileSync("package.json"));
+} else {
+    logger.error('Missing package.json');
+    process.exit(1);
+}
+
 prompt.message = "";
 prompt.delimiter = "";
 
 var logger = new (winston.Logger)({
     transports: [
-        new (winston.transports.Console)({ colorize: true, timestamp: true }),
+        new (winston.transports.Console)({ colorize: true, timestamp: function () {
+            return new Date().toLocaleTimeString();
+        } }),
         new (winston.transports.File)({ filename: 'bot.log', json: false, timestamp: true })
     ]
 });
 
-logger.info("backpack.tf automatic v%s starting", version);
+logger.info("backpack.tf automatic v%s starting", appinfo.version);
 
 if (fs.existsSync("settings.json")) {
     settings = JSON.parse(fs.readFileSync("settings.json"));
@@ -322,11 +334,11 @@ function processOffer(offer, mybackpack, theirbackpack) {
         var isChange = true;
 
         // these are the only items we give back as change
-        if (item.market_name == 'Refined Metal' && item.app_data.quality == '6')
+        if (item.market_name == 'Refined Metal' && item.app_data.quality == ItemQualities.Unique)
             myrefined += 1;
-        else if (item.market_name == 'Reclaimed Metal' && item.app_data.quality == '6')
+        else if (item.market_name == 'Reclaimed Metal' && item.app_data.quality == ItemQualities.Unique)
             myrefined += 1 / 3;
-        else if (item.market_name == 'Scrap Metal' && item.app_data.quality == '6')
+        else if (item.market_name == 'Scrap Metal' && item.app_data.quality == ItemQualities.Unique)
             myrefined += 1 / 9;
         else
             isChange = false;
@@ -343,18 +355,31 @@ function processOffer(offer, mybackpack, theirbackpack) {
             isValid = false;
 
         // these are the only items we accept
-        if (item.market_name == 'Mann Co. Supply Crate Key' && item.app_data.quality == '6')
+        if (item.market_name == 'Mann Co. Supply Crate Key' && item.app_data.quality == ItemQualities.Unique)
             keys++;
-        else if (item.market_name == 'Refined Metal' && item.app_data.quality == '6')
+        else if (item.market_name == 'Refined Metal' && item.app_data.quality == ItemQualities.Unique)
             refined += 1;
-        else if (item.market_name == 'Reclaimed Metal' && item.app_data.quality == '6')
+        else if (item.market_name == 'Reclaimed Metal' && item.app_data.quality == ItemQualities.Unique)
             refined += 1 / 3;
-        else if (item.market_name == 'Scrap Metal' && item.app_data.quality == '6')
+        else if (item.market_name == 'Scrap Metal' && item.app_data.quality == ItemQualities.Unique)
             refined += 1 / 9;
-        else if (item.market_name == 'Earbuds' && item.app_data.quality == '6')
+        else if (item.market_name == 'Earbuds' && item.app_data.quality == ItemQualities.Unique)
             earbuds += 1;
-        else
+        else {
             isValid = false;
+            if (item.craftable == true && item.app_data.quality == ItemQualities.Unique) {
+                // we'll also take random weapons at half a scrap
+                item.tags.forEach(function (tag) {
+                    if ((tag.category == 'Type' && tag.internal_name == 'secondary') ||
+                        (tag.category == 'Type' && tag.internal_name == 'primary') ||
+                        (tag.category == 'Type' && tag.internal_name == 'pda2') ||
+                        (tag.category == 'Type' && tag.internal_name == 'melee')) {
+                        isValid = true;
+                        refined += 1 / 18;
+                    }
+                });
+            }
+        }
     });
 
     if (isValid) {
