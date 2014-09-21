@@ -373,6 +373,7 @@ function processOffer(offer, mybackpack, theirbackpack) {
                     if ((tag.category == 'Type' && tag.internal_name == 'secondary') ||
                         (tag.category == 'Type' && tag.internal_name == 'primary') ||
                         (tag.category == 'Type' && tag.internal_name == 'pda2') ||
+                        (tag.category == 'Type' && tag.internal_name == 'building') ||
                         (tag.category == 'Type' && tag.internal_name == 'melee')) {
                         isValid = true;
                         refined += 1 / 18;
@@ -503,6 +504,7 @@ function offerAccepted(offer) {
         form: {
             method: 'completed',
             steamid: client.steamID,
+            version: appinfo.version,
             token: settings.account.token,
             offer: offer
         },
@@ -525,6 +527,7 @@ function heartbeat() {
             uri: backpackurl + "/api/IAutomatic/IHeartBeat/",
             form: {
                 method: 'alive',
+                version: appinfo.version,
                 steamid: client.steamID,
                 token: settings.account.token
             },
