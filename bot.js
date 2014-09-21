@@ -2,6 +2,7 @@ var fs = require('fs');
 var request = require('request');
 var prompt = require("prompt");
 var winston = require('winston');
+var moment = require('moment');
 var Steam = require('steam');
 var SteamTradeOffers = require('steam-tradeoffers');
 
@@ -13,7 +14,7 @@ var sessionID;
 var settings = {};
 var cookies = null;
 var sessionID = null;
-var logintimer = 0;
+var errorCount = 0;
 var processing = [];
 var backpackurl = "http://backpack.tf";
 
@@ -42,19 +43,27 @@ if (fs.existsSync("package.json")) {
 prompt.message = "";
 prompt.delimiter = "";
 
+if (fs.existsSync("settings.json"))
+    settings = JSON.parse(fs.readFileSync("settings.json"));
+
+if (!settings.dateFormat)
+    settings.dateFormat = 'HH:mm:ss';
+
 var logger = new (winston.Logger)({
     transports: [
         new (winston.transports.Console)({ colorize: true, timestamp: function () {
-            return new Date().toLocaleTimeString();
+            return moment().format(settings.dateFormat);
         } }),
-        new (winston.transports.File)({ filename: 'bot.log', json: false, timestamp: true })
+        new (winston.transports.File)({ filename: 'bot.log', json: false, timestamp: function () {
+            return moment().format(settings.dateFormat);
+        } })
     ]
 });
 
 logger.info("backpack.tf automatic v%s starting", appinfo.version);
+dateLog();
 
-if (fs.existsSync("settings.json")) {
-    settings = JSON.parse(fs.readFileSync("settings.json"));
+if (settings.account) {
     login();
 } else {
     prompt.get({
@@ -78,7 +87,7 @@ if (fs.existsSync("settings.json")) {
         }
     }, function (err, result) {
         if (err) {
-            logger.error("Error " + err + " reading Steam details, quitting.");
+            logger.error(err + " reading Steam details, quitting.");
             process.exit(1);
         } else {
             settings.account = {};
@@ -96,6 +105,11 @@ if (fs.existsSync("settings.json")) {
             });
         }
     });
+}
+
+function dateLog() {
+    setTimeout(dateLog, moment().endOf('day').diff(moment()));
+    logger.info(moment().format("dddd, MMMM Do, YYYY"));
 }
 
 client.on('error', function (e) {
@@ -117,15 +131,13 @@ client.on('error', function (e) {
             }
         });
     } else if (e.cause === 'logonFail') {
-        logger.warn("Failed to login to Steam.");
-        logintimer = 60;
+        logger.warn("Failed to login to Steam. Trying again in 60 seconds.");
         clearTimeout(heartbeattimer);
-        login();
+        setTimeout(login, 60000);
     } else if (e.cause === 'loggedOff') {
-        logger.warn("Logged off from Steam.");
-        logintimer = 10;
+        logger.warn("Logged off from Steam. Trying again in 10 seconds.");
         clearTimeout(heartbeattimer);
-        login();
+        setTimeout(login, 10000);
     } else {
         for (var result in Steam.EResult) {
             if (Steam.EResult[result] == e.eresult) {
@@ -137,25 +149,19 @@ client.on('error', function (e) {
 });
 
 function login() {
-    if (logintimer == 0) {
-        logger.info('Connecting to Steam...');
-        client.logOn({
-            accountName: settings.account.accountName,
-            password: settings.account.password,
-            shaSentryfile: new Buffer(settings.account.shaSentryfile, 'base64')
-        });
-    }
-    else {
-        logintimer--;
-        setTimeout(login, 1000);
-    }
+    logger.info('Connecting to Steam...');
+    client.logOn({
+        accountName: settings.account.accountName,
+        password: settings.account.password,
+        shaSentryfile: new Buffer(settings.account.shaSentryfile, 'base64')
+    });
 };
 
 function webLogin() {
     client.webLogOn(function (data) {
-        logger.info('Offer handling ready, checking for offers we may have missed...');
+        logger.info('Offer handling ready.');
         offers.setup(sessionID, data);
-        setTimeout(resolveOffers, 2000); //Resolve any offers that were sent when offline.
+        setTimeout(resolveOffers, 5000); //Resolve any offers that were sent when offline.
     });
 }
 
@@ -181,7 +187,7 @@ client.on('webSessionID', function (data) {
 });
 
 client.on('tradeOffers', function (count) {
-    logger.info(count + " trade offers pending.");
+    logger.info(count + " trade offer" + (count != 1 ? "s" : "") + " pending.");
     if (count !== 0)
         resolveOffers();
 });
@@ -464,9 +470,16 @@ function acceptOffer(offer) {
     offers.acceptOffer(offer.tradeofferid, function (err) {
         if (err) {
             logger.warn("[%d] Error occurred whilst accepting - retrying in 10 seconds...", offer.tradeofferid);
-            setTimeout(function () {
-                recheckOffer(offer);
-            }, 10000);
+            errorCount++;
+            if (errorCount > 6) {
+                errorCount = 0;
+                logger.info("Too many errors, refreshing cookie...");
+                webLogin();
+            } else {
+                setTimeout(function () {
+                    recheckOffer(offer);
+                }, 10000);
+            }
         } else {
             offerAccepted(offer);
         }
