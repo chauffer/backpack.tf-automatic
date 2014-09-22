@@ -422,8 +422,8 @@ function processOffer(offer, mybackpack, theirbackpack) {
                         }
                     });
 
-                    refined = Math.floor(Math.round(refined * 9) / 9 * 100) / 100;
-                    myrefined = Math.floor(Math.round(myrefined * 9) / 9 * 100) / 100;
+                    refined = Math.floor(Math.round(refined * 18) / 18 * 100) / 100;
+                    myrefined = Math.floor(Math.round(myrefined * 18) / 18 * 100) / 100;
 
                     var message = "Asked:" +
                         (myearbuds ? " " + myearbuds + " earbud" + (myearbuds != 1 ? "s" : "") : "") +
