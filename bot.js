@@ -14,7 +14,7 @@ var sessionID;
 var settings = {};
 var appinfo = {};
 var sessionID = null;
-var errorCount = 0;
+var errorCount = [];
 var processing = [];
 var backpackurl = "http://backpack.tf";
 
@@ -43,8 +43,14 @@ if (fs.existsSync("package.json")) {
 prompt.message = "";
 prompt.delimiter = "";
 
-if (fs.existsSync("settings.json"))
-    settings = JSON.parse(fs.readFileSync("settings.json"));
+if (fs.existsSync("settings.json")) {
+    try {
+        settings = JSON.parse(fs.readFileSync("settings.json"));
+    } catch (ex) {
+        console.log(ex + " in settings.json, exiting.");
+        process.exit(1);
+    }
+}
 
 if (!settings.dateFormat)
     settings.dateFormat = "HH:mm:ss";
@@ -161,7 +167,12 @@ function webLogin() {
     client.webLogOn(function (data) {
         logger.info("Offer handling ready.");
         offers.setup(sessionID, data);
-        processing = [];
+        errorCount.forEach(function(val, key) {
+            if(val >= 6) {
+                processing[key] = 0;
+                errorCount[key] = 0;
+            }
+        });
         setTimeout(resolveOffers, 5000); //Resolve any offers that were sent when offline.
     });
 }
@@ -471,9 +482,8 @@ function acceptOffer(offer) {
     offers.acceptOffer(offer.tradeofferid, function (err) {
         if (err) {
             logger.warn("[%d] Error occurred whilst accepting - retrying in 10 seconds...", offer.tradeofferid);
-            errorCount++;
-            if (errorCount > 6) {
-                errorCount = 0;
+            errorCount[offer.tradeofferid]++;
+            if (errorCount[offer.tradeofferid] >= 6) {
                 logger.info("Too many errors, refreshing cookie...");
                 webLogin();
             } else {
