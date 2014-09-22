@@ -161,6 +161,7 @@ function webLogin() {
     client.webLogOn(function (data) {
         logger.info("Offer handling ready.");
         offers.setup(sessionID, data);
+        processing = [];
         setTimeout(resolveOffers, 5000); //Resolve any offers that were sent when offline.
     });
 }
