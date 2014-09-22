@@ -1,10 +1,10 @@
-var fs = require('fs');
-var request = require('request');
+var fs = require("fs");
+var request = require("request");
 var prompt = require("prompt");
-var winston = require('winston');
-var moment = require('moment');
-var Steam = require('steam');
-var SteamTradeOffers = require('steam-tradeoffers');
+var winston = require("winston");
+var moment = require("moment");
+var Steam = require("steam");
+var SteamTradeOffers = require("steam-tradeoffers");
 
 var offers = new SteamTradeOffers();
 var client = new Steam.SteamClient();
@@ -12,13 +12,13 @@ var client = new Steam.SteamClient();
 var heartbeattimer;
 var sessionID;
 var settings = {};
-var cookies = null;
+var appinfo = {};
 var sessionID = null;
 var errorCount = 0;
 var processing = [];
 var backpackurl = "http://backpack.tf";
 
-TradeOffer = {
+var TradeOffer = {
     ETradeOfferStateInvalid: 1,
     ETradeOfferStateActive: 2,
     ETradeOfferStateAccepted: 3,
@@ -29,14 +29,14 @@ TradeOffer = {
     ETradeOfferStateInvalidItems: 8
 };
 
-ItemQualities = {
+var ItemQualities = {
     Unique: "6"
-}
+};
 
 if (fs.existsSync("package.json")) {
     appinfo = JSON.parse(fs.readFileSync("package.json"));
 } else {
-    logger.error('Missing package.json');
+    logger.error("Missing package.json");
     process.exit(1);
 }
 
@@ -47,14 +47,14 @@ if (fs.existsSync("settings.json"))
     settings = JSON.parse(fs.readFileSync("settings.json"));
 
 if (!settings.dateFormat)
-    settings.dateFormat = 'HH:mm:ss';
+    settings.dateFormat = "HH:mm:ss";
 
 var logger = new (winston.Logger)({
     transports: [
         new (winston.transports.Console)({ colorize: true, timestamp: function () {
             return moment().format(settings.dateFormat);
         } }),
-        new (winston.transports.File)({ filename: 'bot.log', json: false, timestamp: function () {
+        new (winston.transports.File)({ filename: "bot.log", json: false, timestamp: function () {
             return moment().format(settings.dateFormat);
         } })
     ]
@@ -70,18 +70,18 @@ if (settings.account) {
         properties: {
             username: {
                 description: "> ".red + "Steam username".green + ":".red,
-                type: 'string',
+                type: "string",
                 required: true
             },
             password: {
                 description: "> ".red + "Steam password".green + ":".red,
-                type: 'string',
+                type: "string",
                 hidden: true,
                 required: true
             },
             token: {
                 description: "> ".red + "backpack.tf token".green + ":".red,
-                type: 'string',
+                type: "string",
                 required: true
             }
         }
@@ -108,17 +108,17 @@ if (settings.account) {
 }
 
 function dateLog() {
-    setTimeout(dateLog, moment().endOf('day').diff(moment()));
+    setTimeout(dateLog, moment().endOf("day").diff(moment()));
     logger.info(moment().format("dddd, MMMM Do, YYYY"));
 }
 
-client.on('error', function (e) {
+client.on("error", function (e) {
     if (e.eresult === Steam.EResult.AccountLogonDenied) {
         prompt.get({
             properties: {
                 authcode: {
                     description: "> ".red + "Steam guard code".green + ":".red,
-                    type: 'string',
+                    type: "string",
                     required: true
                 }
             }
@@ -130,18 +130,18 @@ client.on('error', function (e) {
                 client.logOn({accountName: settings.account.accountName, password: settings.account.password, authCode: result.authcode});
             }
         });
-    } else if (e.cause === 'logonFail') {
+    } else if (e.cause === "logonFail") {
         logger.warn("Failed to login to Steam. Trying again in 60 seconds.");
         clearTimeout(heartbeattimer);
         setTimeout(login, 60000);
-    } else if (e.cause === 'loggedOff') {
+    } else if (e.cause === "loggedOff") {
         logger.warn("Logged off from Steam. Trying again in 10 seconds.");
         clearTimeout(heartbeattimer);
         setTimeout(login, 10000);
     } else {
         for (var result in Steam.EResult) {
             if (Steam.EResult[result] == e.eresult) {
-                logger.error('Steam error: ' + result);
+                logger.error("Steam error: " + result);
                 process.exit(2);
             }
         }
@@ -149,24 +149,24 @@ client.on('error', function (e) {
 });
 
 function login() {
-    logger.info('Connecting to Steam...');
+    logger.info("Connecting to Steam...");
     client.logOn({
         accountName: settings.account.accountName,
         password: settings.account.password,
-        shaSentryfile: new Buffer(settings.account.shaSentryfile, 'base64')
+        shaSentryfile: new Buffer(settings.account.shaSentryfile, "base64")
     });
-};
+}
 
 function webLogin() {
     client.webLogOn(function (data) {
-        logger.info('Offer handling ready.');
+        logger.info("Offer handling ready.");
         offers.setup(sessionID, data);
         setTimeout(resolveOffers, 5000); //Resolve any offers that were sent when offline.
     });
 }
 
-client.on('sentry', function (sentry) {
-    settings.account.shaSentryfile = sentry.toString('base64');
+client.on("sentry", function (sentry) {
+    settings.account.shaSentryfile = sentry.toString("base64");
     fs.writeFile("settings.json", JSON.stringify(settings, null, 4), function (err) {
         if (err) {
             logger.error(err);
@@ -176,24 +176,24 @@ client.on('sentry', function (sentry) {
     });
 });
 
-client.on('loggedOn', function () {
+client.on("loggedOn", function () {
     logger.info(settings.account.accountName + " is now connected.");
     heartbeat();
 });
 
-client.on('webSessionID', function (data) {
+client.on("webSessionID", function (data) {
     sessionID = data;
     webLogin();
 });
 
-client.on('tradeOffers', function (count) {
+client.on("tradeOffers", function (count) {
     logger.info(count + " trade offer" + (count != 1 ? "s" : "") + " pending.");
     if (count !== 0)
         resolveOffers();
 });
 
-offers.on('error', function (e) {
-    logger.warn('Web cookie expired, refreshing');
+offers.on("error", function (e) {
+    logger.warn(e + " - Refreshing web cookie.");
     webLogin();
 });
 
@@ -208,7 +208,7 @@ function resolveOffers() {
             logger.warn(err + " receiving offers, re-trying in 10 seconds.");
             setTimeout(resolveOffers, 10000);
         } else {
-            receivedOffers = offerhist.response.trade_offers_received;
+            var receivedOffers = offerhist.response.trade_offers_received;
 
             try {
                 receivedOffers.forEach(function (offer) {
@@ -340,11 +340,11 @@ function processOffer(offer, mybackpack, theirbackpack) {
         var isChange = true;
 
         // these are the only items we give back as change
-        if (item.market_name == 'Refined Metal' && item.app_data.quality == ItemQualities.Unique)
+        if (item.market_name == "Refined Metal" && item.app_data.quality == ItemQualities.Unique)
             myrefined += 1;
-        else if (item.market_name == 'Reclaimed Metal' && item.app_data.quality == ItemQualities.Unique)
+        else if (item.market_name == "Reclaimed Metal" && item.app_data.quality == ItemQualities.Unique)
             myrefined += 1 / 3;
-        else if (item.market_name == 'Scrap Metal' && item.app_data.quality == ItemQualities.Unique)
+        else if (item.market_name == "Scrap Metal" && item.app_data.quality == ItemQualities.Unique)
             myrefined += 1 / 9;
         else
             isChange = false;
@@ -357,30 +357,30 @@ function processOffer(offer, mybackpack, theirbackpack) {
 
     theiritems.forEach(function (item) {
         // we don't want non-craftable or gifted items, unless it's keys, gg valf
-        if (item.market_name != 'Mann Co. Supply Crate Key' && (item.craftable == false || item.gifted == true))
+        if (item.market_name != "Mann Co. Supply Crate Key" && (item.craftable === false || item.gifted === true))
             isValid = false;
 
         // these are the only items we accept
-        if (item.market_name == 'Mann Co. Supply Crate Key' && item.app_data.quality == ItemQualities.Unique)
+        if (item.market_name == "Mann Co. Supply Crate Key" && item.app_data.quality == ItemQualities.Unique)
             keys++;
-        else if (item.market_name == 'Refined Metal' && item.app_data.quality == ItemQualities.Unique)
+        else if (item.market_name == "Refined Metal" && item.app_data.quality == ItemQualities.Unique)
             refined += 1;
-        else if (item.market_name == 'Reclaimed Metal' && item.app_data.quality == ItemQualities.Unique)
+        else if (item.market_name == "Reclaimed Metal" && item.app_data.quality == ItemQualities.Unique)
             refined += 1 / 3;
-        else if (item.market_name == 'Scrap Metal' && item.app_data.quality == ItemQualities.Unique)
+        else if (item.market_name == "Scrap Metal" && item.app_data.quality == ItemQualities.Unique)
             refined += 1 / 9;
-        else if (item.market_name == 'Earbuds' && item.app_data.quality == ItemQualities.Unique)
+        else if (item.market_name == "Earbuds" && item.app_data.quality == ItemQualities.Unique)
             earbuds += 1;
         else {
             isValid = false;
-            if (item.craftable == true && item.app_data.quality == ItemQualities.Unique) {
+            if (item.craftable === true && item.app_data.quality == ItemQualities.Unique) {
                 // we'll also take random weapons at half a scrap
                 item.tags.forEach(function (tag) {
-                    if ((tag.category == 'Type' && tag.internal_name == 'secondary') ||
-                        (tag.category == 'Type' && tag.internal_name == 'primary') ||
-                        (tag.category == 'Type' && tag.internal_name == 'pda2') ||
-                        (tag.category == 'Type' && tag.internal_name == 'building') ||
-                        (tag.category == 'Type' && tag.internal_name == 'melee')) {
+                    if ((tag.category == "Type" && tag.internal_name == "secondary") ||
+                        (tag.category == "Type" && tag.internal_name == "primary") ||
+                        (tag.category == "Type" && tag.internal_name == "pda2") ||
+                        (tag.category == "Type" && tag.internal_name == "building") ||
+                        (tag.category == "Type" && tag.internal_name == "melee")) {
                         isValid = true;
                         refined += 1 / 18;
                     }
@@ -399,7 +399,7 @@ function processOffer(offer, mybackpack, theirbackpack) {
                 ids: myitemids
             },
             json: true,
-            method: 'POST'
+            method: "POST"
         };
 
         request(request_params, function (err, data) {
@@ -412,18 +412,18 @@ function processOffer(offer, mybackpack, theirbackpack) {
                 if (data.body.response && data.body.response.success) {
                     data.body.response.store.forEach(function (item) {
                         for (var index in item.currencies) {
-                            if (index == 'keys')
+                            if (index == "keys")
                                 mykeys += item.currencies[index];
-                            else if (index == 'earbuds')
+                            else if (index == "earbuds")
                                 myearbuds += item.currencies[index];
-                            else if (index == 'metal') {
+                            else if (index == "metal") {
                                 myrefined += item.currencies[index];
                             }
                         }
                     });
 
-                    refined = Math.floor(Math.round(refined * 1800) / 18) / 100; // hacky hack i know
-                    myrefined = Math.floor(Math.round(myrefined * 1800) / 18) / 100;
+                    refined = Math.floor(Math.round(refined * 9) / 9);
+                    myrefined = Math.floor(Math.round(myrefined * 9) / 9);
 
                     var message = "Asked:" +
                         (myearbuds ? " " + myearbuds + " earbud" + (myearbuds != 1 ? "s" : "") : "") +
@@ -515,17 +515,16 @@ function offerAccepted(offer) {
     var request_params = {
         uri: backpackurl + "/api/IAutomatic/IOfferDetails/",
         form: {
-            method: 'completed',
+            method: "completed",
             steamid: client.steamID,
             version: appinfo.version,
             token: settings.account.token,
             offer: offer
         },
-        json: true,
-        method: 'POST'
+        method: "POST"
     };
 
-    request(request_params, function (err, data) {
+    request(request_params, function (err) {
         if (err) {
             setTimeout(function () {
                 offerAccepted(offer);
@@ -539,17 +538,17 @@ function heartbeat() {
         var request_params = {
             uri: backpackurl + "/api/IAutomatic/IHeartBeat/",
             form: {
-                method: 'alive',
+                method: "alive",
                 version: appinfo.version,
                 steamid: client.steamID,
                 token: settings.account.token
             },
             json: true,
-            method: 'POST'
+            method: "POST"
         };
 
         request(request_params, function (err, data) {
-            if (err || !data.body || (typeof data.body.success === 'undefined')) {
+            if (err || !data.body || (typeof data.body.success === "undefined")) {
                 logger.warn("Error occurred contacting backpack.tf -- trying again in 60 seconds");
                 heartbeattimer = setTimeout(heartbeat, 60000);
             } else {
@@ -557,13 +556,13 @@ function heartbeat() {
                     // every 5 minutes should be sufficient
                     heartbeattimer = setTimeout(heartbeat, 60000 * 5);
                 } else {
-                    logger.error('Invalid backpack.tf token for this account detected. Please update the token below.')
+                    logger.error("Invalid backpack.tf token for this account detected. Please update the token below.");
                     getToken();
                 }
             }
         });
     } else {
-        logger.error('Missing backpack.tf token. Please update the token below.')
+        logger.error("Missing backpack.tf token. Please update the token below.");
         getToken();
     }
 }
@@ -574,7 +573,7 @@ function getToken() {
         properties: {
             token: {
                 description: "> ".red + "backpack.tf token".green + ":".red,
-                type: 'string',
+                type: "string",
                 required: true
             }
         }
