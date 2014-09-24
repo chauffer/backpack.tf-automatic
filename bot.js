@@ -414,15 +414,15 @@ function processOffer(offer, mybackpack, theirbackpack) {
             method: "POST"
         };
 
-        request(request_params, function (err, data) {
-            if (err || !data.body) {
+        request(request_params, function (err, response, body) {
+            if (err || response.statusCode != 200) {
                 logger.warn("[%d] Error reaching backpack.tf, rechecking in 10 seconds...", offer.tradeofferid);
                 setTimeout(function () {
                     processOffer(offer, mybackpack, theirbackpack);
                 }, 10000);
             } else {
-                if (data.body.response && data.body.response.success) {
-                    data.body.response.store.forEach(function (item) {
+                if (body.response && body.response.success) {
+                    body.response.store.forEach(function (item) {
                         for (var index in item.currencies) {
                             if (index == "keys")
                                 mykeys += item.currencies[index];
@@ -452,10 +452,10 @@ function processOffer(offer, mybackpack, theirbackpack) {
                         myrefined == refined && // matching currencies
                             myearbuds == earbuds &&
                             mykeys == keys &&
-                            data.body.response.store.length && // make sure the person asked for something else than metal
-                            data.body.response.store.length == (offer.items_to_give.length - changeitems) // matching number of items
+                            body.response.store.length && // make sure the person asked for something else than metal
+                            body.response.store.length == (offer.items_to_give.length - changeitems) // matching number of items
                         ) {
-                        if (data.body.response.other && (data.body.response.other.scammer || data.body.response.other.banned)) {
+                        if (body.response.other && (body.response.other.scammer || body.response.other.banned)) {
                             logger.warn("[%d] %s is banned, declining trade offer...", offer.tradeofferid, offer.steamid_other);
                             offers.declineOffer(offer.tradeofferid, function () {
                                 delete processing[offer.tradeofferid];
@@ -535,8 +535,8 @@ function offerAccepted(offer) {
         method: "POST"
     };
 
-    request(request_params, function (err) {
-        if (err) {
+    request(request_params, function (err, response) {
+        if (err || response.statusCode != 200) {
             setTimeout(function () {
                 offerAccepted(offer);
             }, 60000);
@@ -558,12 +558,12 @@ function heartbeat() {
             method: "POST"
         };
 
-        request(request_params, function (err, data) {
-            if (err || !data.body || (typeof data.body.success === "undefined")) {
+        request(request_params, function (err, response, body) {
+            if (err || response.statusCode != 200) {
                 logger.warn("Error occurred contacting backpack.tf -- trying again in 60 seconds");
                 heartbeattimer = setTimeout(heartbeat, 60000);
             } else {
-                if (data.body.success) {
+                if (body.success) {
                     // every 5 minutes should be sufficient
                     heartbeattimer = setTimeout(heartbeat, 60000 * 5);
                 } else {
