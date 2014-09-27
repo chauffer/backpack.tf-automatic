@@ -5,12 +5,12 @@ var winston = require("winston");
 var moment = require("moment");
 var Steam = require("steam");
 var SteamTradeOffers = require("steam-tradeoffers");
-
 var offers = new SteamTradeOffers();
 var client = new Steam.SteamClient();
 
 var heartbeattimer;
-var sessionID;
+var resolveoffertimer;
+var getcounttimer;
 var settings = {};
 var appinfo = {};
 var sessionID = null;
@@ -19,14 +19,8 @@ var processing = [];
 var backpackurl = "http://backpack.tf";
 
 var TradeOffer = {
-    ETradeOfferStateInvalid: 1,
     ETradeOfferStateActive: 2,
     ETradeOfferStateAccepted: 3,
-    ETradeOfferStateCountered: 4,
-    ETradeOfferStateExpired: 5,
-    ETradeOfferStateCanceled: 6,
-    ETradeOfferStateDeclined: 7,
-    ETradeOfferStateInvalidItems: 8
 };
 
 var ItemQualities = {
@@ -167,13 +161,18 @@ function webLogin() {
     client.webLogOn(function (data) {
         logger.info("Offer handling ready.");
         offers.setup(sessionID, data);
-        errorCount.forEach(function(val, key) {
-            if(val >= 6) {
+        errorCount.forEach(function (val, key) {
+            if (val >= 6) {
                 processing[key] = 0;
                 errorCount[key] = 0;
             }
         });
-        setTimeout(resolveOffers, 5000); //Resolve any offers that were sent when offline.
+
+        //Check if we missed anything while we were gone
+        clearTimeout(getcounttimer);
+        getcounttimer = setTimeout(function () {
+            getOfferCount(0, 0);
+        }, 5000);
     });
 }
 
@@ -200,8 +199,9 @@ client.on("webSessionID", function (data) {
 
 client.on("tradeOffers", function (count) {
     logger.info(count + " trade offer" + (count != 1 ? "s" : "") + " pending.");
-    if (count !== 0)
+    if (count !== 0) {
         resolveOffers();
+    }
 });
 
 offers.on("error", function (e) {
@@ -209,21 +209,41 @@ offers.on("error", function (e) {
     webLogin();
 });
 
+function getOfferCount(timestamp, lastcount) {
+    clearTimeout(getcounttimer);
+    var newtimestamp = Math.round(Date.now() / 1000);
+    request({
+            uri: "http://api.steampowered.com/IEconService/GetTradeOffersSummary/v1?key=" + offers.APIKey + "&time_last_visit=" + timestamp,
+            json: true
+        },
+        function (err, response, body) {
+            if (response.statusCode && response.statusCode == 200 && body.response) {
+                if (body.response.pending_received_count > lastcount) {
+                    resolveOffers();
+                }
+                lastcount = body.response.pending_received_count;
+            }
+            getcounttimer = setTimeout(function () {
+                getOfferCount(newtimestamp, lastcount);
+            }, 60000);
+        }
+    );
+}
+
 function resolveOffers() {
+    clearTimeout(resolveoffertimer);
     offers.getOffers({
         "get_received_offers": 1,
         "get_sent_offers": 0,
         "active_only": 1,
-        "time_historical_cutoff": Math.round(Date.now() / 1000) - 3600 // we only load stuff that was posted recently
+        "time_historical_cutoff": Math.round(Date.now() / 1000) - 3600 // we only load recent active offers
     }, function (err, offerhist) {
         if (err !== null) {
             logger.warn(err + " receiving offers, re-trying in 10 seconds.");
-            setTimeout(resolveOffers, 10000);
+            resolveoffertimer = setTimeout(resolveOffers, 10000);
         } else {
-            var receivedOffers = offerhist.response.trade_offers_received;
-
             try {
-                receivedOffers.forEach(function (offer) {
+                offerhist.response.trade_offers_received.forEach(function (offer) {
                     if (offer.trade_offer_state === TradeOffer.ETradeOfferStateActive) {
                         checkOffer(offer);
                     }
@@ -237,7 +257,7 @@ function resolveOffers() {
 
 function checkOffer(offer) {
     //Check if the offer is not in an existing process before continuing, so we don't process the same offer multiple times
-    if (processing[offer.tradeofferid] !== undefined)
+    if (processing[offer.tradeofferid])
         return;
 
     processing[offer.tradeofferid] = 1;
@@ -364,7 +384,10 @@ function processOffer(offer, mybackpack, theirbackpack) {
         if (isChange)
             changeitems++;
 
-        itemnames.push(item.market_name);
+        if (!itemnames[item.market_name])
+            itemnames[item.market_name] = 1;
+        else
+            itemnames[item.market_name]++;
     });
 
     theiritems.forEach(function (item) {
@@ -437,11 +460,16 @@ function processOffer(offer, mybackpack, theirbackpack) {
                     refined = Math.floor(Math.round(refined * 18) / 18 * 100) / 100;
                     myrefined = Math.floor(Math.round(myrefined * 18) / 18 * 100) / 100;
 
+                    var combinednames = [];
+                    for (var key in itemnames) {
+                        combinednames.push(key + " x" + itemnames[key])
+                    }
+
                     var message = "Asked:" +
                         (myearbuds ? " " + myearbuds + " earbud" + (myearbuds != 1 ? "s" : "") : "") +
                         (mykeys ? " " + mykeys + " key" + (mykeys != 1 ? "s" : "") : "") +
                         (myrefined ? " " + myrefined + " refined" : "") +
-                        " (" + itemnames.join(", ") + "). Offered:" +
+                        " (" + combinednames.join(", ") + "). Offered:" +
                         (earbuds ? " " + earbuds + " earbud" + (earbuds != 1 ? "s" : "") : "") +
                         (keys ? " " + keys + " key" + (keys != 1 ? "s" : "") : "") +
                         (refined ? " " + refined + " refined" : "");
@@ -482,7 +510,10 @@ function acceptOffer(offer) {
     offers.acceptOffer(offer.tradeofferid, function (err) {
         if (err) {
             logger.warn("[%d] Error occurred whilst accepting - retrying in 10 seconds...", offer.tradeofferid);
-            errorCount[offer.tradeofferid]++;
+            if (!errorCount[offer.tradeofferid])
+                errorCount[offer.tradeofferid] = 1;
+            else
+                errorCount[offer.tradeofferid]++;
             if (errorCount[offer.tradeofferid] >= 6) {
                 logger.info("Too many errors, refreshing cookie...");
                 webLogin();
