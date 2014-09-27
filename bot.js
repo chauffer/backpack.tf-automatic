@@ -160,19 +160,18 @@ function login() {
 function webLogin() {
     client.webLogOn(function (data) {
         logger.info("Offer handling ready.");
-        offers.setup(sessionID, data);
-        errorCount.forEach(function (val, key) {
-            if (val >= 6) {
-                processing[key] = 0;
-                errorCount[key] = 0;
-            }
-        });
+        offers.setup(sessionID, data, function() {
+            errorCount.forEach(function (val, key) {
+                if (val >= 6) {
+                    processing[key] = 0;
+                    errorCount[key] = 0;
+                }
+            });
 
-        //Check if we missed anything while we were gone
-        clearTimeout(getcounttimer);
-        getcounttimer = setTimeout(function () {
+            //Check if we missed anything while we were gone
+            clearTimeout(getcounttimer);
             getOfferCount(0, 0);
-        }, 5000);
+        });
     });
 }
 
