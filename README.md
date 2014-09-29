@@ -11,11 +11,18 @@
 
 ### How do I get set up? ###
 
+#### Power Users ####
 * Install [Node.js](http://nodejs.org)
 > Windows users, please see the additional requirements for [ursa](https://github.com/Medium/ursa#testing).
 * [Download](https://bitbucket.org/srabouin/backpack.tf-automatic/downloads) the package or clone the repository to a folder of your choice.
 * From the command line, issue *npm install* from the folder you have unpacked / cloned the repository to install all the required modules. This may take several minutes to run.
 > Windows users, please ensure you are running the command prompt as an administrator.
+
+#### For the lazy ####
+* Install [Node.js](http://nodejs.org)
+* Install [OpenSSL](http://slproweb.com/products/Win32OpenSSL.html)
+* [Download](https://bitbucket.org/srabouin/backpack.tf-automatic/downloads) the pre-packaged version (backpack.tf-automatic-x.x.x-win.zip) and unpack it to a folder of your choice
+* Double-click automatic.bat.
 
 ### Running the application ###
 
