@@ -6,7 +6,7 @@
 * Supports multiple listings in a single offer.
 * Automatically rejects any incoming offer from a banned user or tagged scammer.
 * Please note that at this moment, it only supports TF2 offers.
-* The bot will give handle change as part of the trade offer in metal only. If you're asking for 1 key, it will not accept anything else than 1 key. If you're asking 8.33 refined for an item and the buyer offers 9 refined while asking the item + 2 reclaimed metal back, it will process the offer normally.
+* The bot will handle change as part of the trade offer in metal only. If you're asking for 1 key, it will not accept anything else than 1 key. If you're asking 8.33 refined for an item and the buyer offers 9 refined while asking the item + 2 reclaimed metal back, it will process the offer normally.
 * Every 5 minutes an heartbeat is dispatched to the backpack.tf server. This allows us to identify which users are currently running the bot and switching the trade offer button to an automatic trade offer button.
 
 ### How do I get set up? ###
@@ -29,3 +29,7 @@
 ### Who do I talk to if I run into problems or want to report a bug? ###
 
 * Please use the [issues](https://bitbucket.org/srabouin/backpack.tf-automatic/issues?status=new&status=open) section of this repo.
+
+### I get a specific error when I start the bot, what does it mean? ###
+#### Error: The specified module could not be found. Something about ursaNative.bin ####
+If you are running Windows, you probably didn't follow the steps above. Make sure you have installed [OpenSSL](http://slproweb.com/products/Win32OpenSSL.html). Install the full version, not the light. (Look for Win64 OpenSSL v1.0.1i) You might also need the Visual C++ 2008 Redistributables package from the same page, it will let you know if you need it when you try to install OpenSSL.
