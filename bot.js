@@ -13,6 +13,7 @@ var resolveoffertimer;
 var getcounttimer;
 var settings = {};
 var appinfo = {};
+var lastdatelog;
 var sessionID = null;
 var errorCount = [];
 var processing = [];
@@ -100,7 +101,7 @@ if (settings.account) {
                     logger.error(err);
                 } else {
                     logger.info("Configuration saved to settings.json.");
-                    client.logOn(settings.account);
+                    login();
                 }
             });
         }
@@ -108,8 +109,11 @@ if (settings.account) {
 }
 
 function dateLog() {
+    var text = moment().format("dddd, MMMM Do, YYYY");
     setTimeout(dateLog, moment().endOf("day").diff(moment()));
-    logger.info(moment().format("dddd, MMMM Do, YYYY"));
+    if(text != lastdatelog)
+        logger.info(text);
+    lastdatelog = text;
 }
 
 client.on("error", function (e) {
@@ -150,11 +154,18 @@ client.on("error", function (e) {
 
 function login() {
     logger.info("Connecting to Steam...");
-    client.logOn({
-        accountName: settings.account.accountName,
-        password: settings.account.password,
-        shaSentryfile: new Buffer(settings.account.shaSentryfile, "base64")
-    });
+    if(settings.account.shaSentryfile) {
+        client.logOn({
+            accountName: settings.account.accountName,
+            password: settings.account.password,
+            shaSentryfile: new Buffer(settings.account.shaSentryfile, "base64")
+        });
+    } else {
+        client.logOn({
+            accountName: settings.account.accountName,
+            password: settings.account.password
+        });
+    }
 }
 
 function webLogin() {
@@ -216,7 +227,7 @@ function getOfferCount(timestamp, lastcount) {
             json: true
         },
         function (err, response, body) {
-            if (response.statusCode && response.statusCode == 200 && body.response) {
+            if (response && response.statusCode && response.statusCode == 200 && body.response) {
                 if (body.response.pending_received_count > lastcount) {
                     resolveOffers();
                 }
