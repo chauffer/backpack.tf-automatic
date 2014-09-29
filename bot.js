@@ -472,7 +472,10 @@ function processOffer(offer, mybackpack, theirbackpack) {
 
                     var combinednames = [];
                     for (var key in itemnames) {
-                        combinednames.push(key + " x" + itemnames[key])
+                        if(itemnames[key] > 1)
+                            combinednames.push(key + " x" + itemnames[key])
+                        else
+                            combinednames.push(key)
                     }
 
                     var message = "Asked:" +
