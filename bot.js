@@ -1,5 +1,5 @@
 var fs = require("fs");
-var request = require("request");
+var request = require("./node_modules/steam-tradeoffers/node_modules/request");
 var prompt = require("prompt");
 var winston = require("winston");
 var moment = require("moment");
@@ -21,7 +21,7 @@ var backpackurl = "http://backpack.tf";
 
 var TradeOffer = {
     ETradeOfferStateActive: 2,
-    ETradeOfferStateAccepted: 3,
+    ETradeOfferStateAccepted: 3
 };
 
 var ItemQualities = {
@@ -31,7 +31,7 @@ var ItemQualities = {
 if (fs.existsSync("package.json")) {
     appinfo = JSON.parse(fs.readFileSync("package.json"));
 } else {
-    logger.error("Missing package.json");
+    console.log("Missing package.json");
     process.exit(1);
 }
 
@@ -50,12 +50,16 @@ if (fs.existsSync("settings.json")) {
 if (!settings.dateFormat)
     settings.dateFormat = "HH:mm:ss";
 
+var showDebug = 'info';
+if (!settings.hideDebug)
+    showDebug = 'debug';
+
 var logger = new (winston.Logger)({
     transports: [
-        new (winston.transports.Console)({ colorize: true, timestamp: function () {
+        new (winston.transports.Console)({ level: showDebug, colorize: true, timestamp: function () {
             return moment().format(settings.dateFormat);
         } }),
-        new (winston.transports.File)({ filename: "bot.log", json: false, timestamp: function () {
+        new (winston.transports.File)({ level: 'debug', filename: "bot.log", json: false, timestamp: function () {
             return moment().format(settings.dateFormat);
         } })
     ]
@@ -65,7 +69,7 @@ logger.info("backpack.tf automatic v%s starting", appinfo.version);
 dateLog();
 
 if (settings.account) {
-    login();
+    login(0);
 } else {
     prompt.get({
         properties: {
@@ -101,7 +105,7 @@ if (settings.account) {
                     logger.error(err);
                 } else {
                     logger.info("Configuration saved to settings.json.");
-                    login();
+                    login(0);
                 }
             });
         }
@@ -135,13 +139,11 @@ client.on("error", function (e) {
             }
         });
     } else if (e.cause === "logonFail") {
-        logger.warn("Failed to login to Steam. Trying again in 60 seconds.");
-        clearTimeout(heartbeattimer);
-        setTimeout(login, 60000);
+        logger.debug("Failed to login to Steam. Trying again in 60s.");
+        login(60);
     } else if (e.cause === "loggedOff") {
-        logger.warn("Logged off from Steam. Trying again in 10 seconds.");
-        clearTimeout(heartbeattimer);
-        setTimeout(login, 10000);
+        logger.debug("Logged off from Steam. Trying again in 10s.");
+        login(10);
     } else {
         for (var result in Steam.EResult) {
             if (Steam.EResult[result] == e.eresult) {
@@ -152,25 +154,31 @@ client.on("error", function (e) {
     }
 });
 
-function login() {
-    logger.info("Connecting to Steam...");
-    if(settings.account.shaSentryfile) {
-        client.logOn({
-            accountName: settings.account.accountName,
-            password: settings.account.password,
-            shaSentryfile: new Buffer(settings.account.shaSentryfile, "base64")
-        });
+function login(delay) {
+    clearTimeout(getcounttimer);
+    clearTimeout(heartbeattimer);
+
+    if(delay) {
+        setTimeout(function() { login(0); }, delay * 1000);
     } else {
-        client.logOn({
-            accountName: settings.account.accountName,
-            password: settings.account.password
-        });
+        logger.info("Connecting to Steam...");
+        if(settings.account.shaSentryfile) {
+            client.logOn({
+                accountName: settings.account.accountName,
+                password: settings.account.password,
+                shaSentryfile: new Buffer(settings.account.shaSentryfile, "base64")
+            });
+        } else {
+            client.logOn({
+                accountName: settings.account.accountName,
+                password: settings.account.password
+            });
+        }
     }
 }
 
 function webLogin() {
     client.webLogOn(function (data) {
-        logger.info("Offer handling ready.");
         offers.setup(sessionID, data, function() {
             errorCount.forEach(function (val, key) {
                 if (val >= 6) {
@@ -179,9 +187,9 @@ function webLogin() {
                 }
             });
 
-            //Check if we missed anything while we were gone
+            logger.info("Offer handling ready.");
             clearTimeout(getcounttimer);
-            getOfferCount(0, 0);
+            getOfferCount(0, 0); //Check if we missed anything while we were gone
         });
     });
 }
@@ -198,7 +206,7 @@ client.on("sentry", function (sentry) {
 });
 
 client.on("loggedOn", function () {
-    logger.info(settings.account.accountName + " is now connected.");
+    logger.info("Connected to Steam.");
     heartbeat();
 });
 
@@ -208,15 +216,23 @@ client.on("webSessionID", function (data) {
 });
 
 client.on("tradeOffers", function (count) {
-    logger.info(count + " trade offer" + (count != 1 ? "s" : "") + " pending.");
+    logger.info("steam: " + count + " pending.");
     if (count !== 0) {
         resolveOffers();
     }
 });
 
 offers.on("error", function (e) {
-    logger.warn(e + " - Refreshing web cookie.");
+    logger.debug(e + " - Refreshing web cookie.");
     webLogin();
+});
+
+client.on("debug", function(msg) {
+    logger.debug("steam: "+msg);
+});
+
+offers.on("debug", function(msg) {
+    logger.debug("offers: "+msg);
 });
 
 function getOfferCount(timestamp, lastcount) {
@@ -228,7 +244,8 @@ function getOfferCount(timestamp, lastcount) {
         },
         function (err, response, body) {
             if (response && response.statusCode && response.statusCode == 200 && body.response) {
-                if (body.response.pending_received_count > lastcount) {
+                logger.debug('offers: ' + body.response.pending_received_count + ' pending, ' + body.response.new_received_count + ' new received.');
+                if (body.response.pending_received_count > lastcount || body.response.new_received_count) {
                     resolveOffers();
                 }
                 lastcount = body.response.pending_received_count;
@@ -249,7 +266,7 @@ function resolveOffers() {
         "time_historical_cutoff": Math.round(Date.now() / 1000) - 3600 // we only load recent active offers
     }, function (err, offerhist) {
         if (err !== null) {
-            logger.warn(err + " receiving offers, re-trying in 10 seconds.");
+            logger.warn(err + " receiving offers, re-trying in 10s.");
             resolveoffertimer = setTimeout(resolveOffers, 10000);
         } else {
             try {
@@ -265,6 +282,32 @@ function resolveOffers() {
     });
 }
 
+function loadPartnerInventory(offer) {
+    offers.loadPartnerInventory(offer.steamid_other, 440, 2, function (err, data) {
+        if (data) {
+            loadMyInventory(offer, data);
+        } else {
+            logger.warn("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Failed to download partner inventory. Retrying in 5s...");
+            setTimeout(function() {
+                loadPartnerInventory(offer);
+            }, 5000);
+        }
+    }, offer.tradeofferid);
+}
+
+function loadMyInventory(offer, theirbackpack) {
+    offers.loadMyInventory(440, 2, function (err, data) {
+        if (data) {
+            processOffer(offer, data, theirbackpack);
+        } else {
+            logger.warn("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Failed to download my inventory. Retrying in 5s...");
+            setTimeout(function() {
+                loadMyInventory(offer, theirbackpack);
+            }, 5000);
+        }
+    });
+}
+
 function checkOffer(offer) {
     //Check if the offer is not in an existing process before continuing, so we don't process the same offer multiple times
     if (processing[offer.tradeofferid])
@@ -274,9 +317,6 @@ function checkOffer(offer) {
 
     // we only check offers that involve a complete trade
     if (offer.items_to_give !== undefined && offer.items_to_receive !== undefined) {
-        var theirbackpack = [],
-            mybackpack = [];
-
         // we only want to deal with TF2 offers
         var valid = offer.items_to_receive.every(function (item) {
             return item.appid == 440;
@@ -284,35 +324,7 @@ function checkOffer(offer) {
 
         if (valid) {
             logger.info("[%d] Checking offer from %s...", offer.tradeofferid, offer.steamid_other);
-            try {
-                offers.loadPartnerInventory(offer.steamid_other, 440, 2, function (err, data) {
-                    if (err) {
-                        valid = false;
-                    } else {
-                        theirbackpack = data;
-                        offers.loadMyInventory(440, 2, function (err, data) {
-                            if (err)
-                                valid = false;
-                            else {
-                                mybackpack = data;
-                                processOffer(offer, mybackpack, theirbackpack);
-                                return;
-                            }
-                        });
-                    }
-                });
-            } catch (e) {
-                valid = false;
-            }
-
-            if (!valid) {
-                logger.warn("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Failed to download inventories. Retrying in 5 seconds...");
-                delete processing[offer.tradeofferid];
-                setTimeout(function () {
-                    checkOffer(offer);
-                }, 5000);
-                return;
-            }
+            loadPartnerInventory(offer);
         } else
             logger.info("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Skipping: Includes non-supported items.");
     } else
@@ -421,11 +433,7 @@ function processOffer(offer, mybackpack, theirbackpack) {
             if (item.craftable === true && item.app_data.quality == ItemQualities.Unique) {
                 // we'll also take random weapons at half a scrap
                 item.tags.forEach(function (tag) {
-                    if ((tag.category == "Type" && tag.internal_name == "secondary") ||
-                        (tag.category == "Type" && tag.internal_name == "primary") ||
-                        (tag.category == "Type" && tag.internal_name == "pda2") ||
-                        (tag.category == "Type" && tag.internal_name == "building") ||
-                        (tag.category == "Type" && tag.internal_name == "melee")) {
+                    if ((tag.category == "Type") && ["secondary", "primary", "pda2", "building", "melee"].indexOf(tag.internal_name) !== -1) {
                         isValid = true;
                         refined += 1 / 18;
                     }
@@ -435,7 +443,6 @@ function processOffer(offer, mybackpack, theirbackpack) {
     });
 
     if (isValid) {
-
         var request_params = {
             uri: backpackurl + "/api/IGetUserTrades/v1/",
             form: {
@@ -449,7 +456,7 @@ function processOffer(offer, mybackpack, theirbackpack) {
 
         request(request_params, function (err, response, body) {
             if (err || response.statusCode != 200) {
-                logger.warn("[%d] Error reaching backpack.tf, rechecking in 10 seconds...", offer.tradeofferid);
+                logger.warn("[%d] Error reaching backpack.tf, rechecking in 10s...", offer.tradeofferid);
                 setTimeout(function () {
                     processOffer(offer, mybackpack, theirbackpack);
                 }, 10000);
@@ -502,13 +509,13 @@ function processOffer(offer, mybackpack, theirbackpack) {
                                 delete processing[offer.tradeofferid];
                             });
                         } else {
-                            acceptOffer(offer);
+                            acceptOffer(offer, message);
                         }
                     } else {
-                        logger.warn("[%d] Skipping: This offer does not match any backpack.tf listing.", offer.tradeofferid);
+                        logger.info("[%d] Skipping: This offer does not match any backpack.tf listing.", offer.tradeofferid);
                     }
                 } else {
-                    logger.warn("[%d] Error reaching backpack.tf, rechecking in 10 seconds...", offer.tradeofferid);
+                    logger.warn("[%d] Error reaching backpack.tf, rechecking in 10s...", offer.tradeofferid);
                     setTimeout(function () {
                         processOffer(offer, mybackpack, theirbackpack);
                     }, 10000);
@@ -516,47 +523,47 @@ function processOffer(offer, mybackpack, theirbackpack) {
             }
         });
     } else
-        logger.warn("[%d] Skipping: Offered invalid items.", offer.tradeofferid);
+        logger.info("[%d] Skipping: Offered invalid items.", offer.tradeofferid);
 }
 
-function acceptOffer(offer) {
+function acceptOffer(offer, message) {
     offers.acceptOffer(offer.tradeofferid, function (err) {
         if (err) {
-            logger.warn("[%d] Error occurred whilst accepting - retrying in 10 seconds...", offer.tradeofferid);
+            logger.error("[%d] " + err + " - retrying in 10s...", offer.tradeofferid);
+
             if (!errorCount[offer.tradeofferid])
                 errorCount[offer.tradeofferid] = 1;
             else
                 errorCount[offer.tradeofferid]++;
             if (errorCount[offer.tradeofferid] >= 6) {
-                logger.info("Too many errors, refreshing cookie...");
-                webLogin();
+                logger.debug("Too many errors for a single offer, forcing session refresh...");
+                login(0);
             } else {
                 setTimeout(function () {
-                    recheckOffer(offer);
+                    recheckOffer(offer, message);
                 }, 10000);
             }
         } else {
-            offerAccepted(offer);
+            offerAccepted(offer, message);
         }
     });
 }
 
-function recheckOffer(offer) {
+function recheckOffer(offer, message) {
     logger.info("[%d] Verifying...", offer.tradeofferid);
     offers.getOffer({
         "tradeofferid": offer.tradeofferid
     }, function (err, offerhist) {
         if (err) {
-            logger.warn("[%d] Error caught when verifying offer, trying again in 10 seconds...", offer.tradeofferid);
             setTimeout(function () {
                 recheckOffer(offer);
             }, 10000);
         } else {
             offer = offerhist.response.offer;
             if (offer.trade_offer_state === TradeOffer.ETradeOfferStateAccepted) {
-                offerAccepted(offer);
+                offerAccepted(offer, message);
             } else if (offer.trade_offer_state === TradeOffer.ETradeOfferStateActive) {
-                acceptOffer(offer);
+                acceptOffer(offer, message);
             } else {
                 logger.warn("[%d] Offer still not valid. Maybe it went through, we'll never know.", offer.tradeofferid);
                 delete processing[offer.tradeofferid];
@@ -565,7 +572,7 @@ function recheckOffer(offer) {
     });
 }
 
-function offerAccepted(offer) {
+function offerAccepted(offer, message) {
     logger.info("[%d] Accepted offer.", offer.tradeofferid);
     var request_params = {
         uri: backpackurl + "/api/IAutomatic/IOfferDetails/",
@@ -574,7 +581,8 @@ function offerAccepted(offer) {
             steamid: client.steamID,
             version: appinfo.version,
             token: settings.account.token,
-            offer: offer
+            offer: offer,
+            message: message
         },
         method: "POST"
     };
@@ -604,7 +612,7 @@ function heartbeat() {
 
         request(request_params, function (err, response, body) {
             if (err || response.statusCode != 200) {
-                logger.warn("Error occurred contacting backpack.tf -- trying again in 60 seconds");
+                logger.debug("Error occurred contacting backpack.tf -- trying again in 60s");
                 heartbeattimer = setTimeout(heartbeat, 60000);
             } else {
                 if (body.success) {

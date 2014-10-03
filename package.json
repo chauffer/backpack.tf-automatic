@@ -1,6 +1,6 @@
 {
   "name": "backpack.tf-automatic",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Lets you sell items automatically via backpack.tf without running an actual Steam client",  
   "author": {
     "name": "Steve Rabouin",
@@ -16,7 +16,6 @@
     "steam-tradeoffers": ">= 0.2.4",
     "prompt": "0.2.x",
     "winston": "0.8.x",
-    "request": "2.44.x",
     "moment": "2.8.x"
   },
   "engines": {
@@ -28,4 +27,3 @@
     "url": "https://bitbucket.org/srabouin/backpack.tf-automatic/issues"
   }
 }
-
