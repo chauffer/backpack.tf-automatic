@@ -162,18 +162,11 @@ function login(delay) {
         setTimeout(function() { login(0); }, delay * 1000);
     } else {
         logger.info("Connecting to Steam...");
+        var logon = {accountName: settings.account.accountName, password: settings.account.password};
         if(settings.account.shaSentryfile) {
-            client.logOn({
-                accountName: settings.account.accountName,
-                password: settings.account.password,
-                shaSentryfile: new Buffer(settings.account.shaSentryfile, "base64")
-            });
-        } else {
-            client.logOn({
-                accountName: settings.account.accountName,
-                password: settings.account.password
-            });
+            logon.shaSentryfile = new Buffer(settings.account.shaSentryfile, "base64");
         }
+        client.logOn(logon);
     }
 }
 
