@@ -68,9 +68,7 @@ var logger = new (winston.Logger)({
 logger.info("backpack.tf automatic v%s starting", appinfo.version);
 dateLog();
 
-if (settings.account) {
-    login(0);
-} else {
+function getAccountDetails() {
     prompt.get({
         properties: {
             username: {
@@ -79,7 +77,7 @@ if (settings.account) {
                 required: true
             },
             password: {
-                description: "> ".red + "Steam password".green + ":".red,
+                description: "> ".red + "Steam password ".green +"(hidden):".red,
                 type: "string",
                 hidden: true,
                 required: true
@@ -112,6 +110,12 @@ if (settings.account) {
     });
 }
 
+if (settings.account) {
+    login(0);
+} else {
+    getAccountDetails();
+}
+
 function dateLog() {
     var text = moment().format("dddd, MMMM Do, YYYY");
     setTimeout(dateLog, moment().endOf("day").diff(moment()));
@@ -139,8 +143,9 @@ client.on("error", function (e) {
             }
         });
     } else if (e.cause === "logonFail") {
-        logger.debug("Failed to login to Steam. Trying again in 60s.");
-        login(60);
+        logger.debug("Invalid user/password specified. Please try again.");
+        settings = [];
+        getAccountDetails();
     } else if (e.cause === "loggedOff") {
         logger.debug("Logged off from Steam. Trying again in 10s.");
         login(10);
