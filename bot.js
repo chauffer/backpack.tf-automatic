@@ -3,6 +3,7 @@ var request = require("./node_modules/steam-tradeoffers/node_modules/request");
 var prompt = require("prompt");
 var winston = require("winston");
 var moment = require("moment");
+var extend = require("extend");
 var Steam = require("steam");
 var SteamTradeOffers = require("steam-tradeoffers");
 var offers = new SteamTradeOffers();
@@ -28,6 +29,22 @@ var ItemQualities = {
     Unique: "6"
 };
 
+var defaultSettings = {
+    dateFormat: "HH:mm:ss",
+    logs: {
+        console: {
+            level: "debug"
+        },
+        file: {
+            disabled: false,
+            level: "debug",
+            filename: "bot.log",
+            json: false
+        }
+    },
+    account: {}
+};
+
 if (fs.existsSync("package.json")) {
     appinfo = JSON.parse(fs.readFileSync("package.json"));
 } else {
@@ -38,35 +55,62 @@ if (fs.existsSync("package.json")) {
 prompt.message = "";
 prompt.delimiter = "";
 
-if (fs.existsSync("settings.json")) {
-    try {
-        settings = JSON.parse(fs.readFileSync("settings.json"));
-    } catch (ex) {
-        console.log(ex + " in settings.json, exiting.");
-        process.exit(1);
-    }
+if (!fs.existsSync("settings.json")) {
+    fs.writeFileSync("settings.json", JSON.stringify(defaultSettings, null, 4));
 }
 
-if (!settings.dateFormat)
-    settings.dateFormat = "HH:mm:ss";
+try {
+    settings = JSON.parse(fs.readFileSync("settings.json"));
+} catch (ex) {
+    console.log(ex + " in settings.json, exiting.");
+    process.exit(1);
+}
 
-var showDebug = 'info';
-if (!settings.hideDebug)
-    showDebug = 'debug';
+settings = extend(true, {}, defaultSettings, settings);
+
+var winstonTransports = [
+    new (winston.transports.Console)({
+        level: settings.logs.console.level || "debug",
+        colorize: true,
+        timestamp: function () {
+            return moment().format(settings.dateFormat);
+        }
+    })
+];
+
+if (!settings.logs.file.disabled) {
+    winstonTransports.push(new (winston.transports.File)({
+        level: settings.logs.file.level || "debug",
+        filename: settings.logs.file.filename || "bot.log",
+        json: settings.logs.file.json || false,
+        timestamp: function () {
+            return moment().format(settings.dateFormat);
+        }
+    }));
+}
 
 var logger = new (winston.Logger)({
-    transports: [
-        new (winston.transports.Console)({ level: showDebug, colorize: true, timestamp: function () {
-            return moment().format(settings.dateFormat);
-        } }),
-        new (winston.transports.File)({ level: 'debug', filename: "bot.log", json: false, timestamp: function () {
-            return moment().format(settings.dateFormat);
-        } })
-    ]
+    transports: winstonTransports
 });
 
 logger.info("backpack.tf automatic v%s starting", appinfo.version);
 dateLog();
+
+function saveSettings(message, callback) {
+    fs.writeFile("settings.json", JSON.stringify(settings, null, 4), function (err) {
+        if (err) {
+            logger.error(err);
+        } else {
+            if (message) {
+                logger.info(message);
+            }
+
+            if (callback) {
+                callback();
+            }
+        }
+    });
+}
 
 function getAccountDetails() {
     prompt.get({
@@ -93,18 +137,12 @@ function getAccountDetails() {
             logger.error(err + " reading Steam details, quitting.");
             process.exit(1);
         } else {
-            settings.account = {};
             settings.account.password = result.password;
             settings.account.accountName = result.username;
             settings.account.token = result.token;
 
-            fs.writeFile("settings.json", JSON.stringify(settings, null, 4), function (err) {
-                if (err) {
-                    logger.error(err);
-                } else {
-                    logger.info("Configuration saved to settings.json.");
-                    login(0);
-                }
+            saveSettings("Account details saved.", function () {
+                login(0);
             });
         }
     });
@@ -194,13 +232,7 @@ function webLogin() {
 
 client.on("sentry", function (sentry) {
     settings.account.shaSentryfile = sentry.toString("base64");
-    fs.writeFile("settings.json", JSON.stringify(settings, null, 4), function (err) {
-        if (err) {
-            logger.error(err);
-        } else {
-            logger.info("Sentry information saved to settings.json");
-        }
-    });
+    saveSettings("Sentry information saved.");
 });
 
 client.on("loggedOn", function () {
@@ -478,9 +510,9 @@ function processOffer(offer, mybackpack, theirbackpack) {
                     var combinednames = [];
                     for (var key in itemnames) {
                         if(itemnames[key] > 1)
-                            combinednames.push(key + " x" + itemnames[key])
+                            combinednames.push(key + " x" + itemnames[key]);
                         else
-                            combinednames.push(key)
+                            combinednames.push(key);
                     }
 
                     var message = "Asked:" +
@@ -644,15 +676,7 @@ function getToken() {
             process.exit(1);
         } else {
             settings.account.token = result.token;
-
-            fs.writeFile("settings.json", JSON.stringify(settings, null, 4), function (err) {
-                if (err) {
-                    logger.error(err);
-                } else {
-                    logger.info("Token saved to settings.json.");
-                    heartbeat();
-                }
-            });
+            saveSettings("Backpack.tf user token saved.", heartbeat);
         }
     });
 }
