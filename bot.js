@@ -66,7 +66,7 @@ try {
     process.exit(1);
 }
 
-settings = extend(true, {}, settings, defaultSettings);
+settings = extend(true, {}, defaultSettings, settings);
 
 var winstonTransports = [
     new (winston.transports.Console)({
