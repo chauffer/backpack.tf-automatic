@@ -53,7 +53,6 @@ if (fs.existsSync("package.json")) {
 }
 
 prompt.message = "";
-prompt.delimiter = "";
 
 if (!fs.existsSync("settings.json")) {
     fs.writeFileSync("settings.json", JSON.stringify(defaultSettings, null, 4));
@@ -113,26 +112,30 @@ function saveSettings(message, callback) {
 }
 
 function getAccountDetails() {
+    settings.account = {};
     prompt.get({
         properties: {
             username: {
-                description: "> ".red + "Steam username".green + ":".red,
+                description: "Steam username".green,
                 type: "string",
                 required: true,
                 allowEmpty: false
             },
             password: {
-                description: "> ".red + "Steam password".green + " (hidden):".red,
+                description: "Steam password".green + " (hidden)".red,
                 type: "string",
                 hidden: true,
                 required: true,
                 allowEmpty: false
             },
             token: {
-                description: "> ".red + "backpack.tf token".green + ":".red,
+                description: "backpack.tf token".green,
                 type: "string",
                 required: true,
-                allowEmpty: false
+                allowEmpty: false,
+                // Tokens are 24 characters
+                minLength: 24,
+                maxLength: 24
             }
         }
     }, function (err, result) {
@@ -151,7 +154,7 @@ function getAccountDetails() {
     });
 }
 
-if (settings.account) {
+if (settings.account.accountName && settings.account.password) {
     login(0);
 } else {
     getAccountDetails();
@@ -173,7 +176,7 @@ client.on("error", function (e) {
         prompt.get({
             properties: {
                 authcode: {
-                    description: "> ".red + "Steam guard code".green + ":".red,
+                    description: "Steam guard code".green,
                     type: "string",
                     required: true,
                     allowEmpty: false
@@ -700,7 +703,7 @@ function getToken() {
     prompt.get({
         properties: {
             token: {
-                description: "> ".red + "backpack.tf token".green + ":".red,
+                description: "backpack.tf token".green,
                 type: "string",
                 required: true,
                 allowEmpty: false,
