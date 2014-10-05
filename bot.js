@@ -112,7 +112,6 @@ function saveSettings(message, callback) {
 }
 
 function getAccountDetails() {
-    settings.account = {};
     prompt.get({
         properties: {
             username: {
@@ -192,7 +191,6 @@ client.on("error", function (e) {
         });
     } else if (e.cause === "logonFail") {
         logger.debug("Invalid user/password specified. Please try again.");
-        settings = [];
         getAccountDetails();
     } else if (e.cause === "loggedOff") {
         logger.debug("Logged off from Steam. Trying again in 10s.");
