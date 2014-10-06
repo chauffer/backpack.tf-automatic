@@ -221,7 +221,9 @@ function login(delay) {
     }
 }
 
-function webLogin() {
+function webLogin(callback) {
+    clearTimeout(getcounttimer);
+    clearTimeout(heartbeattimer);
     client.webLogOn(function (data) {
         offers.setup(sessionID, data, function() {
             var key, val;
@@ -235,8 +237,11 @@ function webLogin() {
             }
 
             logger.info("Offer handling ready.");
-            clearTimeout(getcounttimer);
+            heartbeat();
             getOfferCount(0, 0); //Check if we missed anything while we were gone
+            if(typeof callback == 'function'){
+                callback();
+            }
         });
     });
 }
@@ -248,7 +253,6 @@ client.on("sentry", function (sentry) {
 
 client.on("loggedOn", function () {
     logger.info("Connected to Steam.");
-    heartbeat();
 });
 
 client.on("webSessionID", function (data) {
@@ -591,21 +595,28 @@ function processOffer(offer, mybackpack, theirbackpack) {
 function acceptOffer(offer, message) {
     offers.acceptOffer(offer.tradeofferid, function (err) {
         if (err) {
-            logger.error("[%d] " + err + " - retrying in 10s...", offer.tradeofferid);
-
-            if (!errorCount[offer.tradeofferid]) {
-                errorCount[offer.tradeofferid] = 1;
+            if(err === "There was an error accepting this trade offer.  Please try again later. (24)") {
+                logger.error("[%d] Error: Insufficient privileges accepting offer - refresing web cookies...", offer.tradeofferid);
+                webLogin(function() {
+                    acceptOffer(offer, message);
+                });
             } else {
-                errorCount[offer.tradeofferid]++;
-            }
+                logger.error("[%d] " + err + " - retrying in 10s...", offer.tradeofferid);
 
-            if (errorCount[offer.tradeofferid] >= 6) {
-                logger.debug("Too many errors for a single offer, forcing session refresh...");
-                login(0);
-            } else {
-                setTimeout(function () {
-                    recheckOffer(offer, message);
-                }, 10000);
+                if (!errorCount[offer.tradeofferid]) {
+                    errorCount[offer.tradeofferid] = 1;
+                } else {
+                    errorCount[offer.tradeofferid]++;
+                }
+
+                if (errorCount[offer.tradeofferid] >= 6) {
+                    logger.debug("Too many errors for a single offer, forcing session refresh...");
+                    login(0);
+                } else {
+                    setTimeout(function () {
+                        recheckOffer(offer, message);
+                    }, 10000);
+                }                
             }
         } else {
             offerAccepted(offer, message);
