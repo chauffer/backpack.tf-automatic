@@ -469,8 +469,8 @@ function processOffer(offer, mybackpack, theirbackpack) {
     });
 
     theiritems.forEach(function (item) {
-        // we don't want non-craftable or gifted items, unless it's keys, gg valf
-        if (item.market_name != "Mann Co. Supply Crate Key" && (item.craftable === false || item.gifted === true)) {
+        // we don't want non-craftable items, unless it's a key, gg valf
+        if ((item.market_name != "Mann Co. Supply Crate Key") && (item.craftable === false)) {
             isValid = false;
         }
 
@@ -485,6 +485,11 @@ function processOffer(offer, mybackpack, theirbackpack) {
             } else if (item.market_name === "Scrap Metal") {
                 refined += 1 / 9;
             } else if (item.market_name === "Earbuds") {
+                // we don't want gifted earbuds
+                if (item.gifted === true) {
+                    isValid = false;
+                }
+                
                 earbuds += 1;
             } else if (item.craftable === true) {
                 // we'll also take random weapons at half a scrap
