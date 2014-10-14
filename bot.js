@@ -13,12 +13,16 @@ var heartbeattimer;
 var resolveoffertimer;
 var getcounttimer;
 var settings = {};
+var accountinfo = {};
 var appinfo = {};
 var lastdatelog;
 var sessionID = null;
 var errorCount = {};
 var processing = {};
 var backpackurl = "http://backpack.tf";
+var tokenvalidated = false;
+var lastcount = 0;
+var logger;
 
 var TradeOffer = {
     ETradeOfferStateActive: 2,
@@ -38,21 +42,13 @@ var defaultSettings = {
         file: {
             disabled: false,
             level: "debug",
-            filename: "bot.log",
             json: false
         }
     },
-    account: {}
+    accounts: {},
+    lastaccount: "",
+    autologin: false
 };
-
-if (fs.existsSync("package.json")) {
-    appinfo = JSON.parse(fs.readFileSync("package.json"));
-} else {
-    console.log("Missing package.json");
-    process.exit(1);
-}
-
-prompt.message = "";
 
 if (!fs.existsSync("settings.json")) {
     fs.writeFileSync("settings.json", JSON.stringify(defaultSettings, null, 4));
@@ -67,30 +63,57 @@ try {
 
 settings = extend(true, {}, defaultSettings, settings);
 
-var winstonTransports = [
-    new (winston.transports.Console)({
-        level: settings.logs.console.level || "debug",
-        colorize: true,
-        timestamp: function () {
-            return moment().format(settings.dateFormat);
-        }
-    })
-];
+function setupLogger() {
+    var winstonTransports = [
+        new (winston.transports.Console)({
+            level: settings.logs.console.level || "debug",
+            colorize: true,
+            timestamp: function () {
+                return moment().format(settings.dateFormat);
+            }
+        })
+    ];
 
-if (!settings.logs.file.disabled) {
-    winstonTransports.push(new (winston.transports.File)({
-        level: settings.logs.file.level || "debug",
-        filename: settings.logs.file.filename || "bot.log",
-        json: settings.logs.file.json || false,
-        timestamp: function () {
-            return moment().format(settings.dateFormat);
-        }
-    }));
+    if (!settings.logs.file.disabled && accountinfo.username) {
+        winstonTransports.push(new (winston.transports.File)({
+            level: settings.logs.file.level || "debug",
+            filename: accountinfo.username + ".log",
+            json: settings.logs.file.json || false,
+            timestamp: function () {
+                return moment().format(settings.dateFormat);
+            }
+        }));
+    }
+
+    logger = new (winston.Logger)({
+        transports: winstonTransports
+    });
 }
 
-var logger = new (winston.Logger)({
-    transports: winstonTransports
-});
+setupLogger();
+
+if (fs.existsSync("package.json")) {
+    appinfo = JSON.parse(fs.readFileSync("package.json"));
+} else {
+    logger.error("Missing package.json");
+    process.exit(1);
+}
+
+prompt.message = "";
+
+// convert to new format
+if(settings.account && settings.account.accountName) {
+    settings.accounts[settings.account.accountName] = {
+        accountName: settings.account.accountName,
+        token: settings.account.token
+    };
+    if(settings.account.shaSentryfile) {
+        settings.accounts[settings.account.accountName].shaSentryfile = settings.account.shaSentryfile;
+    }
+
+    settings.lastaccount = settings.account.accountName;
+    delete settings.account;
+}
 
 logger.info("backpack.tf automatic v%s starting", appinfo.version);
 dateLog();
@@ -118,7 +141,8 @@ function getAccountDetails() {
                 description: "Steam username".green,
                 type: "string",
                 required: true,
-                allowEmpty: false
+                allowEmpty: false,
+                default: settings.lastaccount
             },
             password: {
                 description: "Steam password".green + " (hidden)".red,
@@ -126,15 +150,6 @@ function getAccountDetails() {
                 hidden: true,
                 required: true,
                 allowEmpty: false
-            },
-            token: {
-                description: "backpack.tf token".green,
-                type: "string",
-                required: true,
-                allowEmpty: false,
-                // Tokens are 24 characters
-                minLength: 24,
-                maxLength: 24
             }
         }
     }, function (err, result) {
@@ -142,18 +157,39 @@ function getAccountDetails() {
             logger.error(err + " reading Steam details, quitting.");
             process.exit(1);
         } else {
-            settings.account.password = result.password;
-            settings.account.accountName = result.username;
-            settings.account.token = result.token;
+            accountinfo.username = result.username;
+            accountinfo.password = result.password;
 
-            saveSettings("Account details saved.", function () {
-                login(0);
+            if(!settings.accounts[accountinfo.username]) {
+                settings.accounts[accountinfo.username] = { username: accountinfo.username };
+            } else {
+                settings.accounts[accountinfo.username].username = accountinfo.username;
+            }
+
+            prompt.confirm('Save password to file?'.green + " (plain text)".red, { default: 'no' }, function(err, save) {
+                if (err) {
+                    logger.error(err + " reading Steam details, quitting.");
+                    process.exit(1);
+                } else {
+                    if(save) {
+                        settings.autologin = accountinfo.username;
+                        settings.accounts[accountinfo.username].password = accountinfo.password;
+                    } else {
+                        settings.autologin = false;
+                        delete settings.accounts[accountinfo.username].password;
+                    }
+                    settings.lastaccount = accountinfo.username;
+                    saveSettings("Settings saved to settings.json");
+                    login(0);
+                }
             });
         }
     });
 }
 
-if (settings.account.accountName && settings.account.password) {
+if(settings.autologin && settings.accounts[settings.autologin] && settings.accounts[settings.autologin].username && settings.accounts[settings.autologin].password) {
+    accountinfo.username = settings.accounts[settings.autologin].username;
+    accountinfo.password = settings.accounts[settings.autologin].password;
     login(0);
 } else {
     getAccountDetails();
@@ -186,7 +222,7 @@ client.on("error", function (e) {
                 logger.error("Error " + err + " getting Steam guard code, quitting.");
                 process.exit(1);
             } else {
-                client.logOn({accountName: settings.account.accountName, password: settings.account.password, authCode: result.authcode});
+                client.logOn({accountName: accountinfo.username, password: accountinfo.password, authCode: result.authcode});
             }
         });
     } else if (e.cause === "logonFail") {
@@ -208,14 +244,17 @@ client.on("error", function (e) {
 function login(delay) {
     clearTimeout(getcounttimer);
     clearTimeout(heartbeattimer);
+    tokenvalidated = false;
 
     if (delay) {
         setTimeout(function() { login(0); }, delay * 1000);
     } else {
+        setupLogger();
+
         logger.info("Connecting to Steam...");
-        var logon = {accountName: settings.account.accountName, password: settings.account.password};
-        if (settings.account.shaSentryfile) {
-            logon.shaSentryfile = new Buffer(settings.account.shaSentryfile, "base64");
+        var logon = {accountName: accountinfo.username, password: accountinfo.password};
+        if (settings.accounts[accountinfo.username] && settings.accounts[accountinfo.username].shaSentryfile) {
+            logon.shaSentryfile = new Buffer(settings.accounts[accountinfo.username].shaSentryfile, "base64");
         }
         client.logOn(logon);
     }
@@ -238,7 +277,6 @@ function webLogin(callback) {
 
             logger.info("Offer handling ready.");
             heartbeat();
-            getOfferCount(0, 0); //Check if we missed anything while we were gone
             if(typeof callback == 'function'){
                 callback();
             }
@@ -247,12 +285,12 @@ function webLogin(callback) {
 }
 
 client.on("sentry", function (sentry) {
-    settings.account.shaSentryfile = sentry.toString("base64");
+    settings.accounts[accountinfo.username].shaSentryfile = sentry.toString("base64");
     saveSettings("Sentry information saved.");
 });
 
 client.on("loggedOn", function () {
-    logger.info("Connected to Steam.");
+    logger.info("Connected to Steam on " + moment().format("dddd, MMMM Do, YYYY"));
 });
 
 client.on("webSessionID", function (data) {
@@ -261,9 +299,12 @@ client.on("webSessionID", function (data) {
 });
 
 client.on("tradeOffers", function (count) {
-    logger.info("steam: " + count + " trade offer" + (count !== 1 ? "s" : "") + " pending.");
-    if (count !== 0) {
-        resolveOffers();
+    // only process offers if token is valid
+    if(tokenvalidated) {
+        logger.info("steam: " + count + " trade offer" + (count !== 1 ? "s" : "") + " pending.");
+        if (count !== 0) {
+            resolveOffers();
+        }        
     }
 });
 
@@ -280,12 +321,10 @@ offers.on("debug", function(msg) {
     logger.debug("offers: " + msg);
 });
 
-function getOfferCount(timestamp, lastcount) {
-    var newtimestamp = Math.round(Date.now() / 1000);
-
+function getOfferCount() {
     clearTimeout(getcounttimer);
     request({
-            uri: "http://api.steampowered.com/IEconService/GetTradeOffersSummary/v1?key=" + offers.APIKey + "&time_last_visit=" + timestamp,
+            uri: "http://api.steampowered.com/IEconService/GetTradeOffersSummary/v1?key=" + offers.APIKey + "&time_last_visit=" + Math.round(Date.now() / 1000),
             json: true
         },
         function (err, response, body) {
@@ -297,10 +336,10 @@ function getOfferCount(timestamp, lastcount) {
                 lastcount = body.response.pending_received_count;
             }
             getcounttimer = setTimeout(function () {
-                getOfferCount(newtimestamp, lastcount);
+                getOfferCount();
             }, 60000);
         }
-    );
+    );        
 }
 
 function resolveOffers() {
@@ -660,7 +699,7 @@ function offerAccepted(offer, message) {
             method: "completed",
             steamid: client.steamID,
             version: appinfo.version,
-            token: settings.account.token,
+            token: settings.accounts[accountinfo.username].token,
             offer: offer,
             message: message
         },
@@ -678,14 +717,14 @@ function offerAccepted(offer, message) {
 }
 
 function heartbeat() {
-    if (settings.account.token) {
+    if (settings.accounts[accountinfo.username].token) {
         var request_params = {
             uri: backpackurl + "/api/IAutomatic/IHeartBeat/",
             form: {
                 method: "alive",
                 version: appinfo.version,
                 steamid: client.steamID,
-                token: settings.account.token
+                token: settings.accounts[accountinfo.username].token
             },
             json: true,
             method: "POST"
@@ -700,7 +739,10 @@ function heartbeat() {
                     // every 5 minutes should be sufficient
                     heartbeattimer = setTimeout(heartbeat, 60000 * 5);
                     logger.debug("Heartbeat sent to backpack.tf");
+                    tokenvalidated = true;
+                    getOfferCount();
                 } else {
+                    tokenvalidated = false;
                     logger.error("Invalid backpack.tf token for this account detected. Please update the token below.");
                     getToken();
                 }
@@ -731,7 +773,7 @@ function getToken() {
             logger.error("Error " + err + " reading token.");
             process.exit(1);
         } else {
-            settings.account.token = result.token;
+            settings.accounts[accountinfo.username].token = result.token;
             saveSettings("Backpack.tf user token saved.", heartbeat);
         }
     });
