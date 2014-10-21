@@ -149,7 +149,7 @@ function getAccountDetails() {
                 type: "string",
                 hidden: true,
                 required: true,
-                allowEmpty: false
+                allowEmpty: false              
             }
         }
     }, function (err, result) {
@@ -261,24 +261,37 @@ function login(delay) {
 }
 
 function webLogin(callback) {
+    logger.info("Connecting to Steam Web...");
     clearTimeout(getcounttimer);
     clearTimeout(heartbeattimer);
     client.webLogOn(function (data) {
-        offers.setup(sessionID, data, function() {
-            var key, val;
+        if(settings.accounts[accountinfo.username].apikey) {
+            offers.setAPIKey(settings.accounts[accountinfo.username].apikey);
+        }
 
-            for (key in errorCount) {
-                val = errorCount[key];
-                if (val >= 6) {
-                    delete processing[key];
-                    errorCount[key] = 0;
+        offers.setup(sessionID, data, function(err) {
+            if(err && err.message === 'Access Denied: Family View Enabled') {
+                logger.warn('Unable to fetch Steam Web API key: Family View restriction.');
+                getAPIKey(function() {
+                    logger.info("Offer handling ready.");
+                    heartbeat();
+                });
+            } else {
+                var key, val;
+
+                for (key in errorCount) {
+                    val = errorCount[key];
+                    if (val >= 6) {
+                        delete processing[key];
+                        errorCount[key] = 0;
+                    }
                 }
-            }
 
-            logger.info("Offer handling ready.");
-            heartbeat();
-            if(typeof callback == 'function'){
-                callback();
+                logger.info("Offer handling ready.");
+                heartbeat();
+                if(typeof callback == 'function'){
+                    callback();
+                }
             }
         });
     });
@@ -339,7 +352,7 @@ function getOfferCount() {
                 getOfferCount();
             }, 60000);
         }
-    );        
+    );
 }
 
 function resolveOffers() {
@@ -775,6 +788,31 @@ function getToken() {
         } else {
             settings.accounts[accountinfo.username].token = result.token;
             saveSettings("Backpack.tf user token saved.", heartbeat);
+        }
+    });
+}
+
+function getAPIKey(callback) {
+    prompt.get({
+        properties: {
+            apikey: {
+                description: "Steam Web API Key".green,
+                type: "string",
+                required: true,
+                allowEmpty: false,
+                // API Keys are 32 characters
+                minLength: 32,
+                maxLength: 32
+            }
+        }
+    }, function (err, result) {
+        if (err) {
+            logger.error("Error " + err + " reading api key.");
+            process.exit(1);
+        } else {
+            offers.setAPIKey(result.apikey);
+            settings.accounts[accountinfo.username].apikey = result.apikey;
+            saveSettings("API Key saved.", callback);
         }
     });
 }
