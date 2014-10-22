@@ -265,10 +265,6 @@ function webLogin(callback) {
     clearTimeout(getcounttimer);
     clearTimeout(heartbeattimer);
     client.webLogOn(function (data) {
-        if(settings.accounts[accountinfo.username].apikey) {
-            offers.setAPIKey(settings.accounts[accountinfo.username].apikey);
-        }
-
         offers.setup(sessionID, data, function(err) {
             if(err && err.message === 'Access Denied: Family View Enabled') {
                 logger.warn('Unable to fetch Steam Web API key: Family View restriction.');
