@@ -272,9 +272,9 @@ function webLogin(callback) {
         offers.setup(sessionID, data, function(err) {
             if(err && err.message === 'Access Denied: Family View Enabled') {
                 logger.warn('Unable to fetch Steam Web API key: Family View restriction.');
-                getFamilyPIN(function(cookies) {
-                    webLogin(callback, cookies);
-                });
+                getFamilyPIN(function() {
+                    webLogin(callback);
+                });                    
             } else {
                 var key, val;
 
@@ -815,8 +815,7 @@ function getFamilyPIN(callback) {
                     logger.warn("Error: " + err);
                     getFamilyPIN(callback);
                 } else {
-                    settings.accounts[accountinfo.username].pin = result.pin;
-                    saveSettings("PIN saved.", callback());                    
+                    callback();                    
                 }
             });
         }
