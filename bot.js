@@ -272,9 +272,8 @@ function webLogin(callback) {
         offers.setup(sessionID, data, function(err) {
             if(err && err.message === 'Access Denied: Family View Enabled') {
                 logger.warn('Unable to fetch Steam Web API key: Family View restriction.');
-                getAPIKey(function() {
-                    logger.info("Offer handling ready.");
-                    heartbeat();
+                getFamilyPIN(function(cookies) {
+                    webLogin(callback, cookies);
                 });
             } else {
                 var key, val;
@@ -293,7 +292,7 @@ function webLogin(callback) {
                     callback();
                 }
             }
-        });
+        });        
     });
 }
 
@@ -792,27 +791,34 @@ function getToken() {
     });
 }
 
-function getAPIKey(callback) {
+function getFamilyPIN(callback) {
     prompt.get({
         properties: {
-            apikey: {
-                description: "Steam Web API Key".green,
+            pin: {
+                description: "Steam Family View PIN".green + " (hidden)".red,
                 type: "string",
                 required: true,
                 allowEmpty: false,
-                // API Keys are 32 characters
-                minLength: 32,
-                maxLength: 32
+                // PINs are 4 characters
+                minLength: 4,
+                maxLength: 4,
+                hidden: true
             }
         }
     }, function (err, result) {
         if (err) {
-            logger.error("Error " + err + " reading api key.");
+            logger.error("Error " + err + " reading family pin.");
             process.exit(1);
         } else {
-            offers.setAPIKey(result.apikey);
-            settings.accounts[accountinfo.username].apikey = result.apikey;
-            saveSettings("API Key saved.", callback);
+            offers.getFamilyCookie(result.pin, function(err) {
+                if(err) {
+                    logger.warn("Error: " + err);
+                    getFamilyPIN(callback);
+                } else {
+                    settings.accounts[accountinfo.username].pin = result.pin;
+                    saveSettings("PIN saved.", callback());                    
+                }
+            });
         }
     });
 }
