@@ -19,9 +19,9 @@
 * Type *node bot*
 > Windows users, please ensure you are running the command prompt as an administrator when performing the installation.
 
-#### For the lazy ####
+#### For the lazy - Windows only ####
 * Install [Node.js](http://nodejs.org)
-* Install [OpenSSL](http://slproweb.com/products/Win32OpenSSL.html) (Install the FULL version. You may also need to install [this](http://www.microsoft.com/downloads/details.aspx?familyid=bd2a6171-e2d6-4230-b809-9a8d7548c1b6) if you don't have Visual Studio installed.)
+* Install [OpenSSL](http://slproweb.com/products/Win32OpenSSL.html) (Install the FULL version and ensure you allow the files to go in your system folder when prompted. You may also need to install [this](http://www.microsoft.com/downloads/details.aspx?familyid=bd2a6171-e2d6-4230-b809-9a8d7548c1b6) if you don't have Visual Studio installed.)
 * [Download](https://bitbucket.org/srabouin/backpack.tf-automatic/downloads) the pre-packaged version (backpack.tf-automatic-x.x.x-win.zip) and unpack it to a folder of your choice
 * Double-click automatic.bat.
 
