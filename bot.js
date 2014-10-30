@@ -267,29 +267,43 @@ function webLogin(callback) {
     client.webLogOn(function (data) {
         offers.setup(sessionID, data, function(err) {
             if(err && err.message === 'Access Denied: Family View Enabled') {
-                logger.warn('Unable to fetch Steam Web API key: Family View restriction.');
-                getFamilyPIN(function() {
-                    webLogin(callback);
-                });                    
-            } else {
-                var key, val;
-
-                for (key in errorCount) {
-                    val = errorCount[key];
-                    if (val >= 6) {
-                        delete processing[key];
-                        errorCount[key] = 0;
-                    }
+                if(accountinfo.pin) {
+                    offers.getFamilyCookie(accountinfo.pin, callback);
+                } else {
+                    logger.warn('Unable to fetch Steam Web API key: Family View restriction.');
+                    getFamilyPIN(function() {
+                        webLogin(callback);
+                    });                                        
                 }
-
-                logger.info("Offer handling ready.");
-                heartbeat();
-                if(typeof callback == 'function'){
-                    callback();
+            } else {
+                if(accountinfo.pin) {
+                    offers.getFamilyCookie(accountinfo.pin, function() {
+                        offerReady(callback);
+                    });
+                } else {
+                    offerReady(callback);
                 }
             }
         });        
     });
+}
+
+function offerReady(callback) {
+    var key, val;
+
+    for (key in errorCount) {
+        val = errorCount[key];
+        if (val >= 6) {
+            delete processing[key];
+            errorCount[key] = 0;
+        }
+    }
+
+    logger.info("Offer handling ready.");
+    heartbeat();
+    if(typeof callback == 'function'){
+        callback();
+    }
 }
 
 client.on("sentry", function (sentry) {
@@ -380,10 +394,30 @@ function loadPartnerInventory(offer) {
         if (data) {
             loadMyInventory(offer, data);
         } else {
-            logger.warn("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Failed to download partner inventory. Retrying in 5s...");
-            setTimeout(function() {
-                loadPartnerInventory(offer);
-            }, 5000);
+            offers.getOffer({
+                "tradeofferid": offer.tradeofferid
+            }, function (offer_err, offerhist) {
+                if (offer_err) {
+                    setTimeout(function () {
+                        loadPartnerInventory(offer);
+                    }, 1000);
+                } else {
+                    if (offerhist.response.offer.trade_offer_state === TradeOffer.ETradeOfferStateAccepted) {
+                        logger.warn("[%d] Offer accepted elsewhere, ignorning.", offer.tradeofferid);
+                        delete processing[offer.tradeofferid];
+                    } else if (err && err.message && err.message === "No session") {
+                        logger.warn("[%d] Session expired, refreshing...", offer.tradeofferid, err);
+                        webLogin(function() {
+                            loadPartnerInventory(offer);
+                        });
+                    } else {
+                        logger.warn("[%d] Failed to download partner inventory: %s, retrying in 5s...", offer.tradeofferid, err);
+                        setTimeout(function () {
+                            loadPartnerInventory(offer);
+                        }, 5000);
+                    }
+                }
+            });
         }
     }, offer.tradeofferid);
 }
@@ -393,7 +427,7 @@ function loadMyInventory(offer, theirbackpack) {
         if (data) {
             processOffer(offer, data, theirbackpack);
         } else {
-            logger.warn("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Failed to download my inventory. Retrying in 5s...");
+            logger.warn("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Failed to download my inventory: " + err + ". Retrying in 5s...");
             setTimeout(function() {
                 loadMyInventory(offer, theirbackpack);
             }, 5000);
@@ -647,8 +681,11 @@ function processOffer(offer, mybackpack, theirbackpack) {
 function acceptOffer(offer, message) {
     offers.acceptOffer(offer.tradeofferid, function (err) {
         if (err) {
-            if(err === "There was an error accepting this trade offer.  Please try again later. (24)") {
-                logger.error("[%d] Error: Insufficient privileges accepting offer - refresing web cookies...", offer.tradeofferid);
+            if(
+                err === "There was an error accepting this trade offer.  Please try again later. (24)" || // cookie expired/steamguard shit
+                err === "There was an error accepting this trade offer.  Please try again later. (28)" // family view probably
+            ) {
+                logger.error("[%d] Error: Insufficient privileges accepting offer - refreshing web cookies...", offer.tradeofferid);
                 webLogin(function() {
                     acceptOffer(offer, message);
                 });
@@ -684,7 +721,7 @@ function recheckOffer(offer, message) {
         if (err) {
             setTimeout(function () {
                 recheckOffer(offer);
-            }, 10000);
+            }, 1000);
         } else {
             offer = offerhist.response.offer;
             if (offer.trade_offer_state === TradeOffer.ETradeOfferStateAccepted) {
@@ -811,6 +848,7 @@ function getFamilyPIN(callback) {
                     logger.warn("Error: " + err);
                     getFamilyPIN(callback);
                 } else {
+                    accountinfo.pin = result.pin;
                     callback();                    
                 }
             });
