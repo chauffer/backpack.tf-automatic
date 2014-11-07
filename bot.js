@@ -26,7 +26,8 @@ var logger;
 
 var TradeOffer = {
     ETradeOfferStateActive: 2,
-    ETradeOfferStateAccepted: 3
+    ETradeOfferStateAccepted: 3,
+    ETradeOfferStateInvalidItems: 8
 };
 
 var ItemQualities = {
@@ -380,6 +381,11 @@ function resolveOffers() {
                 offerhist.response.trade_offers_received.forEach(function (offer) {
                     if (offer.trade_offer_state === TradeOffer.ETradeOfferStateActive) {
                         checkOffer(offer);
+                    } else if (offer.trade_offer_state === TradeOffer.ETradeOfferStateInvalidItems) {
+                        logger.info("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Offer contains items no longer available, discarding.");
+                        offers.declineOffer(offer.tradeofferid, function () {
+                            delete processing[offer.tradeofferid];
+                        });
                     }
                 });
             } catch (e) {
@@ -394,30 +400,19 @@ function loadPartnerInventory(offer) {
         if (data) {
             loadMyInventory(offer, data);
         } else {
-            offers.getOffer({
-                "tradeofferid": offer.tradeofferid
-            }, function (offer_err, offerhist) {
-                if (offer_err) {
+            if (err && err.message && err.message === "No session") {
+                logger.warn("[%d] Session expired, refreshing...", offer.tradeofferid, err);
+                webLogin(function() {
+                    loadPartnerInventory(offer);
+                });
+            } else {
+                checkOfferState(offer, function() {
+                    logger.warn("[%d] Failed to download partner inventory: %s, retrying in 5s...", offer.tradeofferid, err);
                     setTimeout(function () {
                         loadPartnerInventory(offer);
-                    }, 1000);
-                } else {
-                    if (offerhist.response.offer.trade_offer_state === TradeOffer.ETradeOfferStateAccepted) {
-                        logger.warn("[%d] Offer accepted elsewhere, ignorning.", offer.tradeofferid);
-                        delete processing[offer.tradeofferid];
-                    } else if (err && err.message && err.message === "No session") {
-                        logger.warn("[%d] Session expired, refreshing...", offer.tradeofferid, err);
-                        webLogin(function() {
-                            loadPartnerInventory(offer);
-                        });
-                    } else {
-                        logger.warn("[%d] Failed to download partner inventory: %s, retrying in 5s...", offer.tradeofferid, err);
-                        setTimeout(function () {
-                            loadPartnerInventory(offer);
-                        }, 5000);
-                    }
-                }
-            });
+                    }, 5000);
+                });
+            }
         }
     }, offer.tradeofferid);
 }
@@ -427,10 +422,44 @@ function loadMyInventory(offer, theirbackpack) {
         if (data) {
             processOffer(offer, data, theirbackpack);
         } else {
-            logger.warn("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Failed to download my inventory: " + err + ". Retrying in 5s...");
+            if (err && err.message && err.message === "No session") {
+                logger.warn("[%d] Session expired, refreshing...", offer.tradeofferid, err);
+                webLogin(function() {
+                    loadMyInventory(offer, theirbackpack);
+                });
+            } else {
+                checkOfferState(offer, function() {
+                    logger.warn("[%d] Failed to download my inventory: %s, Retrying in 5s...", offer.tradeofferid, err);
+                    setTimeout(function () {
+                        loadMyInventory(offer, theirbackpack);
+                    }, 5000);
+                });
+            }
+        }
+    });
+}
+
+function checkOfferState(offer, callback) {
+    offers.getOffer({
+        "tradeofferid": offer.tradeofferid
+    }, function (err, offerhist) {
+        if (err) {
+            logger.debug("[%d] offers: failed to get offer data, retrying in 5s...", tradeofferid);
             setTimeout(function() {
-                loadMyInventory(offer, theirbackpack);
+                getOfferData(tradeofferid, callback);
             }, 5000);
+        } else {
+            if (offerhist.response.offer.trade_offer_state === TradeOffer.ETradeOfferStateAccepted) {
+                logger.warn("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Offer accepted elsewhere, ignorning.", offer.tradeofferid);
+                delete processing[offer.tradeofferid];
+            } else if (offerhist.response.offer.trade_offer_state === TradeOffer.ETradeOfferStateInvalidItems) {
+                logger.info("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Offer contains items no longer available, discarding.");
+                offers.declineOffer(offer.tradeofferid, function () {
+                    delete processing[offer.tradeofferid];
+                });
+            } else {
+                callback();
+            }
         }
     });
 }
