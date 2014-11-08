@@ -382,10 +382,7 @@ function resolveOffers() {
                     if (offer.trade_offer_state === TradeOffer.ETradeOfferStateActive) {
                         checkOffer(offer);
                     } else if (offer.trade_offer_state === TradeOffer.ETradeOfferStateInvalidItems) {
-                        logger.info("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Offer contains items no longer available, discarding.");
-                        offers.declineOffer(offer.tradeofferid, function () {
-                            delete processing[offer.tradeofferid];
-                        });
+                        discardOffer(offer);
                     }
                 });
             } catch (e) {
@@ -453,10 +450,7 @@ function checkOfferState(offer, callback) {
                 logger.warn("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Offer accepted elsewhere, ignorning.", offer.tradeofferid);
                 delete processing[offer.tradeofferid];
             } else if (offerhist.response.offer.trade_offer_state === TradeOffer.ETradeOfferStateInvalidItems) {
-                logger.info("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Offer contains items no longer available, discarding.");
-                offers.declineOffer(offer.tradeofferid, function () {
-                    delete processing[offer.tradeofferid];
-                });
+                discardOffer(offer);
             } else {
                 callback();
             }
@@ -757,11 +751,20 @@ function recheckOffer(offer, message) {
                 offerAccepted(offer, message);
             } else if (offer.trade_offer_state === TradeOffer.ETradeOfferStateActive) {
                 acceptOffer(offer, message);
+            } else if (offer.trade_offer_state === TradeOffer.ETradeOfferStateInvalidItems) {
+                discardOffer(offer);
             } else {
                 logger.warn("[%d] Offer still not valid. Maybe it went through, we'll never know.", offer.tradeofferid);
                 delete processing[offer.tradeofferid];
             }
         }
+    });
+}
+
+function discardOffer(offer) {
+    logger.info("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Offer contains items no longer available, discarding.");
+    offers.declineOffer(offer.tradeofferid, function () {
+        delete processing[offer.tradeofferid];
     });
 }
 
