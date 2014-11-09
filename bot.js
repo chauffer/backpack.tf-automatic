@@ -713,7 +713,7 @@ function processOffer(offer, mybackpack, theirbackpack) {
                         " (" + combinednames.join(", ") + "). Offered:" +
                         (earbuds ? " " + earbuds + " earbud" + (earbuds !== 1 ? "s" : "") : "") +
                         (keys ? " " + keys + " key" + (keys !== 1 ? "s" : "") : "") +
-                        (refined ? " " + refined + " refined." : "");
+                        (refined ? " " + refined + " refined" : "") + ".";
 
                     logger.info("[%d] %s", offer.tradeofferid, message);
 
