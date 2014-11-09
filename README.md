@@ -15,13 +15,16 @@
 * Install [Node.js](http://nodejs.org)
 > Windows users, please see the additional requirements for [ursa](https://github.com/Medium/ursa#testing).
 * [Download](https://bitbucket.org/srabouin/backpack.tf-automatic/downloads) the package or clone the repository to a folder of your choice.
-* From the command line, issue *npm install* from the folder you have unpacked / cloned the repository to install all the required modules. This may take several minutes to run.
-* Type *node bot*
+* From the command line, issue `npm install` from the folder you have unpacked / cloned the repository to install all the required modules. This may take several minutes to run.
+* Type `node bot`
 > Windows users, please ensure you are running the command prompt as an administrator when performing the installation.
+* Optionally, if you don't want to be bothered with crashes, you can use `forever` or a similar package. On the command line, install it with `npm install -g forever`. Then you can use it as a node replacement like such: `forever bot.js`. Don't forget `.js`, it is mandatory with forever.
 
 #### For the lazy - Windows only ####
 * Install [Node.js](http://nodejs.org)
-* Install [OpenSSL](http://slproweb.com/products/Win32OpenSSL.html) (Install the FULL version and ensure you allow the files to go in your system folder when prompted. You may also need to install [this](http://www.microsoft.com/downloads/details.aspx?familyid=bd2a6171-e2d6-4230-b809-9a8d7548c1b6) if you don't have Visual Studio installed.)
+* Install [OpenSSL](http://slproweb.com/products/Win32OpenSSL.html) (Install the FULL version - links below). Ensure you allow the files to go in your system folder when prompted. You may also need to install [this](http://www.microsoft.com/downloads/details.aspx?familyid=bd2a6171-e2d6-4230-b809-9a8d7548c1b6) if you don't have Visual Studio installed.)
+    * Windows 64-bit: http://slproweb.com/download/Win64OpenSSL-1_0_1j.exe
+    * Windows 32-bit: http://slproweb.com/download/Win32OpenSSL-1_0_1j.exe
 * [Download](https://bitbucket.org/srabouin/backpack.tf-automatic/downloads) the pre-packaged version (backpack.tf-automatic-x.x.x-win.zip) and unpack it to a folder of your choice
 * Double-click automatic.bat.
 
