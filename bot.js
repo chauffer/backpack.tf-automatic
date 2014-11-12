@@ -42,8 +42,10 @@ var defaultSettings = {
         },
         file: {
             disabled: false,
-            level: "debug",
-            json: false
+            level: "debug"
+        },
+        trade: {
+            disabled: false
         }
     },
     accounts: {},
@@ -65,29 +67,67 @@ try {
 settings = extend(true, {}, defaultSettings, settings);
 
 function setupLogger() {
-    var winstonTransports = [
+    var level = {
+        levels: {
+            debug: 0,
+            verbose: 1,
+            info: 2,
+            warn: 3,
+            error: 4,
+            trade: 5
+        },
+        colors: {
+            verbose: 'cyan',
+            debug: 'blue',
+            info: 'green',
+            warn: 'yellow',
+            error: 'red',
+            trade: 'magenta'
+        }
+    };
+
+    winston.addColors(level.colors);
+    winston.setLevels(level.levels);
+
+    function timestamp() {
+        return moment().format(settings.dateFormat);
+    }
+
+    var transports = [
         new (winston.transports.Console)({
+            name: "console",
             level: settings.logs.console.level || "debug",
             colorize: true,
-            timestamp: function () {
-                return moment().format(settings.dateFormat);
-            }
+            timestamp: timestamp
         })
     ];
 
-    if (!settings.logs.file.disabled && accountinfo.username) {
-        winstonTransports.push(new (winston.transports.File)({
-            level: settings.logs.file.level || "debug",
-            filename: accountinfo.username + ".log",
-            json: settings.logs.file.json || false,
-            timestamp: function () {
-                return moment().format(settings.dateFormat);
-            }
-        }));
+    if (accountinfo.username) {
+        if (!settings.logs.file.disabled) {
+            transports.push(new (winston.transports.File)({
+                name: "log.all",
+                level: settings.logs.file.level || "debug",
+                filename: accountinfo.username + ".log",
+                json: false,
+                timestamp: timestamp
+            }));
+        }
+
+        if (!settings.logs.trade.disabled) {
+            transports.push(new (winston.transports.File)({
+                name: "log.trade",
+                level: "trade",
+                filename: accountinfo.username + ".trade.log",
+                timestamp: timestamp,
+                json: false
+            }));
+        }
     }
 
     logger = new (winston.Logger)({
-        transports: winstonTransports
+        transports: transports,
+        levels: level.levels,
+        colors: level.colors
     });
 }
 
@@ -150,7 +190,7 @@ function getAccountDetails() {
                 type: "string",
                 hidden: true,
                 required: true,
-                allowEmpty: false              
+                allowEmpty: false
             }
         }
     }, function (err, result) {
@@ -188,9 +228,11 @@ function getAccountDetails() {
     });
 }
 
-if(settings.autologin && settings.accounts[settings.autologin] && settings.accounts[settings.autologin].username && settings.accounts[settings.autologin].password) {
-    accountinfo.username = settings.accounts[settings.autologin].username;
-    accountinfo.password = settings.accounts[settings.autologin].password;
+
+var autologinAccount = settings.autologin && settings.accounts[settings.autologin];
+if (autologinAccount && autologinAccount.username && autologinAccount.password) {
+    accountinfo.username = autologinAccount.username;
+    accountinfo.password = autologinAccount.password;
     login(0);
 } else {
     getAccountDetails();
@@ -274,7 +316,7 @@ function webLogin(callback) {
                     logger.warn('Unable to fetch Steam Web API key: Family View restriction.');
                     getFamilyPIN(function() {
                         webLogin(callback);
-                    });                                        
+                    });
                 }
             } else {
                 if(accountinfo.pin) {
@@ -285,7 +327,7 @@ function webLogin(callback) {
                     offerReady(callback);
                 }
             }
-        });        
+        });
     });
 }
 
@@ -327,7 +369,7 @@ client.on("tradeOffers", function (count) {
         logger.info("steam: " + count + " trade offer" + (count !== 1 ? "s" : "") + " pending.");
         if (count !== 0) {
             resolveOffers();
-        }        
+        }
     }
 });
 
@@ -345,24 +387,29 @@ offers.on("debug", function(msg) {
 });
 
 function getOfferCount() {
+    var uri = "http://api.steampowered.com/IEconService/GetTradeOffersSummary/v1?key=" + offers.APIKey + "&time_last_visit=" + Math.round(Date.now() / 1000);
     clearTimeout(getcounttimer);
-    request({
-            uri: "http://api.steampowered.com/IEconService/GetTradeOffersSummary/v1?key=" + offers.APIKey + "&time_last_visit=" + Math.round(Date.now() / 1000),
-            json: true
-        },
-        function (err, response, body) {
-            if (response && response.statusCode && response.statusCode == 200 && body.response) {
-                logger.debug('offers: ' + body.response.pending_received_count + ' pending, ' + body.response.new_received_count + ' new received.');
-                if (body.response.pending_received_count > lastcount || body.response.new_received_count) {
-                    resolveOffers();
-                }
-                lastcount = body.response.pending_received_count;
+
+    request({uri: uri, json: true}, function (err, response, body) {
+        var resp = body && body.response;
+
+        if (response && response.statusCode && response.statusCode == 200 && resp) {
+            var pendingCount = resp.pending_received_count,
+                newCount = resp.new_received_count;
+
+            logger.debug('offers: ' + pendingCount + ' pending, ' + newCount + ' new received.');
+
+            if (pendingCount > lastcount || newCount) {
+                resolveOffers();
             }
-            getcounttimer = setTimeout(function () {
-                getOfferCount();
-            }, 60000);
+
+            lastcount = pendingCount;
         }
-    );
+
+        getcounttimer = setTimeout(function () {
+            getOfferCount();
+        }, 60000);
+    });
 }
 
 function resolveOffers() {
@@ -447,7 +494,7 @@ function checkOfferState(offer, callback) {
             }, 5000);
         } else {
             if (offerhist.response.offer.trade_offer_state === TradeOffer.ETradeOfferStateAccepted) {
-                logger.warn("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Offer accepted elsewhere, ignorning.", offer.tradeofferid);
+                logger.verbose("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Offer accepted elsewhere, ignorning.", offer.tradeofferid);
                 delete processing[offer.tradeofferid];
             } else if (offerhist.response.offer.trade_offer_state === TradeOffer.ETradeOfferStateInvalidItems) {
                 discardOffer(offer);
@@ -477,10 +524,10 @@ function checkOffer(offer) {
             logger.info("[%d] Checking offer from %s...", offer.tradeofferid, offer.steamid_other);
             loadPartnerInventory(offer);
         } else {
-            logger.info("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Skipping: Includes non-supported items.");
+            logger.info("[" + offer.tradeofferid + "] Skipping: Includes non-supported items.");
         }
     } else {
-        logger.info("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Skipping: Not one of ours.");
+        logger.info("[" + offer.tradeofferid + "] Skipping: Gift offer.");
     }
 }
 
@@ -593,12 +640,12 @@ function processOffer(offer, mybackpack, theirbackpack) {
                 if (item.gifted === true) {
                     isValid = false;
                 }
-                
+
                 earbuds += 1;
             } else if (item.craftable === true) {
                 // we'll also take random weapons at half a scrap
                 item.tags.forEach(function (tag) {
-                    if ((tag.category == "Type") && ["secondary", "primary", "pda2", "building", "melee"].indexOf(tag.internal_name) !== -1) {
+                    if (tag.category === "Type" && ["secondary", "primary", "pda2", "building", "melee"].indexOf(tag.internal_name) !== -1) {
                         isValid = true;
                         refined += 1 / 18;
                     }
@@ -666,7 +713,7 @@ function processOffer(offer, mybackpack, theirbackpack) {
                         " (" + combinednames.join(", ") + "). Offered:" +
                         (earbuds ? " " + earbuds + " earbud" + (earbuds !== 1 ? "s" : "") : "") +
                         (keys ? " " + keys + " key" + (keys !== 1 ? "s" : "") : "") +
-                        (refined ? " " + refined + " refined" : "");
+                        (refined ? " " + refined + " refined" : "") + ".";
 
                     logger.info("[%d] %s", offer.tradeofferid, message);
 
@@ -704,12 +751,11 @@ function processOffer(offer, mybackpack, theirbackpack) {
 function acceptOffer(offer, message) {
     offers.acceptOffer(offer.tradeofferid, function (err) {
         if (err) {
-            if(
-                err === "There was an error accepting this trade offer.  Please try again later. (24)" || // cookie expired/steamguard shit
-                err === "There was an error accepting this trade offer.  Please try again later. (28)" // family view probably
-            ) {
+            var errorcode = err ? parseInt(err.match(/\d+/)[0]) || -1 : -1;
+
+            if (errorcode === 24 /* cookie expired/steamguard shit */ || errorcode === 28 /* family view probably */) {
                 logger.error("[%d] Error: Insufficient privileges accepting offer - refreshing web cookies...", offer.tradeofferid);
-                webLogin(function() {
+                webLogin(function () {
                     acceptOffer(offer, message);
                 });
             } else {
@@ -728,7 +774,7 @@ function acceptOffer(offer, message) {
                     setTimeout(function () {
                         recheckOffer(offer, message);
                     }, 10000);
-                }                
+                }
             }
         } else {
             offerAccepted(offer, message);
@@ -737,7 +783,7 @@ function acceptOffer(offer, message) {
 }
 
 function recheckOffer(offer, message) {
-    logger.info("[%d] Verifying...", offer.tradeofferid);
+    logger.verbose("[%d] Verifying...", offer.tradeofferid);
     offers.getOffer({
         "tradeofferid": offer.tradeofferid
     }, function (err, offerhist) {
@@ -762,14 +808,15 @@ function recheckOffer(offer, message) {
 }
 
 function discardOffer(offer) {
-    logger.info("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Offer contains items no longer available, discarding.");
+    logger.verbose("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Offer contains items no longer available, discarding.");
     offers.declineOffer(offer.tradeofferid, function () {
         delete processing[offer.tradeofferid];
     });
 }
 
 function offerAccepted(offer, message) {
-    logger.info("[%d] Accepted offer.", offer.tradeofferid);
+    logger.transports['log.trade'].log('trade', message);
+    logger.trade("[%d] Accepted offer.", offer.tradeofferid);
     var request_params = {
         uri: backpackurl + "/api/IAutomatic/IOfferDetails/",
         form: {
@@ -785,7 +832,7 @@ function offerAccepted(offer, message) {
 
     request(request_params, function (err, response) {
         if (err || response.statusCode !== 200) {
-            logger.debug("[%d] Error reaching backpack.tf, resending in 60s...", offer.tradeofferid);
+            logger.warn("[%d] Error reaching backpack.tf, resending in 60s...", offer.tradeofferid);
             setTimeout(function () {
                 offerAccepted(offer);
             }, 60000);
@@ -809,7 +856,7 @@ function heartbeat() {
 
         request(request_params, function (err, response, body) {
             if (err || response.statusCode !== 200) {
-                logger.debug("Error occurred contacting backpack.tf, trying again in 60s...");
+                logger.warn("Error occurred contacting backpack.tf, trying again in 60s...");
                 heartbeattimer = setTimeout(heartbeat, 60000);
             } else {
                 if (body.success) {
@@ -881,7 +928,7 @@ function getFamilyPIN(callback) {
                     getFamilyPIN(callback);
                 } else {
                     accountinfo.pin = result.pin;
-                    callback();                    
+                    callback();
                 }
             });
         }
