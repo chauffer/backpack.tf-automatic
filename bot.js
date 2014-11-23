@@ -718,9 +718,9 @@ function processOffer(offer, mybackpack, theirbackpack) {
                     logger.info("[%d] %s", offer.tradeofferid, message);
 
                     if (
-                            myrefined === refined && // matching currencies
-                            myearbuds === earbuds &&
-                            mykeys === keys &&
+                            myrefined <= refined && // matching currencies
+                            myearbuds <= earbuds &&
+                            mykeys <= keys &&
                             body.response.store.length && // make sure the person asked for something else than metal
                             body.response.store.length == (offer.items_to_give.length - changeitems) // matching number of items
                         ) {
