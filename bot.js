@@ -284,6 +284,12 @@ client.on("error", function (e) {
     }
 });
 
+// we don't try to login here manually because steam client does that on its own, but we'll stop shit from breaking
+client.on("loggedOff", function() {
+    clearTimeout(getcounttimer);
+    clearTimeout(heartbeattimer);
+});
+
 function login(delay) {
     clearTimeout(getcounttimer);
     clearTimeout(heartbeattimer);
@@ -308,25 +314,27 @@ function webLogin(callback) {
     clearTimeout(getcounttimer);
     clearTimeout(heartbeattimer);
     client.webLogOn(function (data) {
-        offers.setup(sessionID, data, function(err) {
-            if(err && err.message === 'Access Denied: Family View Enabled') {
-                if(accountinfo.pin) {
-                    offers.getFamilyCookie(accountinfo.pin, callback);
+        offers.setup({
+            "sessionID": sessionID, 
+            "webCookie": data
+        }, function() {
+            offers.getAPIKey(function (err) {
+                if(err && err.message === 'Access Denied: Family View Enabled') {
+                    if(accountinfo.pin) {
+                        offers.getFamilyCookie({"pin": accountinfo.pin}, callback);
+                    } else {
+                        getFamilyPIN(callback);
+                    }
                 } else {
-                    logger.warn('Unable to fetch Steam Web API key: Family View restriction.');
-                    getFamilyPIN(function() {
-                        webLogin(callback);
-                    });
-                }
-            } else {
-                if(accountinfo.pin) {
-                    offers.getFamilyCookie(accountinfo.pin, function() {
+                    if(accountinfo.pin) {
+                        offers.getFamilyCookie({"pin": accountinfo.pin}, function() {
+                            offerReady(callback);
+                        });
+                    } else {
                         offerReady(callback);
-                    });
-                } else {
-                    offerReady(callback);
+                    }
                 }
-            }
+            });
         });
     });
 }
@@ -440,7 +448,12 @@ function resolveOffers() {
 }
 
 function loadPartnerInventory(offer) {
-    offers.loadPartnerInventory(offer.steamid_other, 440, 2, function (err, data) {
+    offers.loadPartnerInventory({
+        "partnerSteamId": offer.steamid_other, 
+        "appId": 440, 
+        "contextId": 2,
+        "tradeOfferId": offer.tradeofferid
+    }, function (err, data) {
         if (data) {
             loadMyInventory(offer, data);
         } else {
@@ -458,11 +471,14 @@ function loadPartnerInventory(offer) {
                 });
             }
         }
-    }, offer.tradeofferid);
+    });
 }
 
 function loadMyInventory(offer, theirbackpack) {
-    offers.loadMyInventory(440, 2, function (err, data) {
+    offers.loadMyInventory({
+        "appId": 440, 
+        "contextId": 2
+    }, function (err, data) {
         if (data) {
             processOffer(offer, data, theirbackpack);
         } else {
@@ -726,7 +742,7 @@ function processOffer(offer, mybackpack, theirbackpack) {
                         ) {
                         if (body.response.other && (body.response.other.scammer || body.response.other.banned)) {
                             logger.warn("[%d] %s is banned, declining trade offer...", offer.tradeofferid, offer.steamid_other);
-                            offers.declineOffer(offer.tradeofferid, function () {
+                            offers.declineOffer({"tradeOfferId": offer.tradeofferid}, function () {
                                 delete processing[offer.tradeofferid];
                             });
                         } else {
@@ -749,17 +765,19 @@ function processOffer(offer, mybackpack, theirbackpack) {
 }
 
 function acceptOffer(offer, message) {
-    offers.acceptOffer(offer.tradeofferid, function (err) {
-        if (err) {
-            var errorcode = err ? parseInt(err.match(/\d+/)[0]) || -1 : -1;
+    offers.acceptOffer({"tradeOfferId": offer.tradeofferid}, function (err) {
+        if (err && err.message) {
+            var errorcode = err ? parseInt(err.message.match(/\d+/)[0]) || -1 : -1;
 
             if (errorcode === 24 /* cookie expired/steamguard shit */ || errorcode === 28 /* family view probably */) {
-                logger.error("[%d] Error: Insufficient privileges accepting offer - refreshing web cookies...", offer.tradeofferid);
+                logger.error("[%d] Error %d while accepting - refreshing web cookies...", offer.tradeofferid, errorcode);
                 webLogin(function () {
-                    acceptOffer(offer, message);
+                    setTimeout(function () {
+                        recheckOffer(offer, message);
+                    }, 5000);
                 });
             } else {
-                logger.error("[%d] " + err + " - retrying in 10s...", offer.tradeofferid);
+                logger.error("[%d] %s - retrying in 10s...", offer.tradeofferid, err);
 
                 if (!errorCount[offer.tradeofferid]) {
                     errorCount[offer.tradeofferid] = 1;
@@ -809,7 +827,7 @@ function recheckOffer(offer, message) {
 
 function discardOffer(offer) {
     logger.verbose("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Offer contains items no longer available, discarding.");
-    offers.declineOffer(offer.tradeofferid, function () {
+    offers.declineOffer({"tradeOfferId": offer.tradeofferid}, function () {
         delete processing[offer.tradeofferid];
     });
 }
@@ -922,13 +940,20 @@ function getFamilyPIN(callback) {
             logger.error("Error " + err + " reading family pin.");
             process.exit(1);
         } else {
-            offers.getFamilyCookie(result.pin, function(err) {
+            offers.getFamilyCookie({"pin": result.pin}, function(err) {
                 if(err) {
                     logger.warn("Error: " + err);
                     getFamilyPIN(callback);
                 } else {
                     accountinfo.pin = result.pin;
-                    callback();
+                    offers.getAPIKey(function(err) {
+                        if(err) {
+                            logger.warn('Error fetching API key, Please try again...');
+                            getFamilyPIN();
+                        } else {
+                            offerReady(callback);
+                        }
+                    });
                 }
             });
         }
