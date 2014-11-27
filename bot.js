@@ -458,13 +458,13 @@ function loadPartnerInventory(offer) {
             loadMyInventory(offer, data);
         } else {
             if (err && err.message && err.message === "No session") {
-                logger.warn("[%d] Session expired, refreshing...", offer.tradeofferid, err);
+                logger.warn("[%d] Session expired, refreshing...", offer.tradeofferid);
                 webLogin(function() {
                     loadPartnerInventory(offer);
                 });
             } else {
                 checkOfferState(offer, function() {
-                    logger.warn("[%d] Failed to download partner inventory: %s, retrying in 5s...", offer.tradeofferid, err);
+                    logger.warn("[%d] Failed to download partner inventory: %s, retrying in 5s...", offer.tradeofferid, err.message);
                     setTimeout(function () {
                         loadPartnerInventory(offer);
                     }, 5000);
@@ -483,13 +483,13 @@ function loadMyInventory(offer, theirbackpack) {
             processOffer(offer, data, theirbackpack);
         } else {
             if (err && err.message && err.message === "No session") {
-                logger.warn("[%d] Session expired, refreshing...", offer.tradeofferid, err);
+                logger.warn("[%d] Session expired, refreshing...", offer.tradeofferid);
                 webLogin(function() {
                     loadMyInventory(offer, theirbackpack);
                 });
             } else {
                 checkOfferState(offer, function() {
-                    logger.warn("[%d] Failed to download my inventory: %s, Retrying in 5s...", offer.tradeofferid, err);
+                    logger.warn("[%d] Failed to download my inventory: %s, Retrying in 5s...", offer.tradeofferid, err.message);
                     setTimeout(function () {
                         loadMyInventory(offer, theirbackpack);
                     }, 5000);
