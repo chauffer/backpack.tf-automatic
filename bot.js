@@ -767,7 +767,7 @@ function processOffer(offer, mybackpack, theirbackpack) {
 function acceptOffer(offer, message) {
     offers.acceptOffer({"tradeOfferId": offer.tradeofferid}, function (err) {
         if (err && err.message) {
-            var errorcode = err ? parseInt(err.message.match(/\d+/)[0]) || -1 : -1;
+            var errorcode = err.message ? parseInt(err.message.match(/\d+/)[0]) || -1 : -1;
 
             if (errorcode === 24 /* cookie expired/steamguard shit */ || errorcode === 28 /* family view probably */) {
                 logger.error("[%d] Error %d while accepting - refreshing web cookies...", offer.tradeofferid, errorcode);
@@ -777,7 +777,7 @@ function acceptOffer(offer, message) {
                     }, 5000);
                 });
             } else {
-                logger.error("[%d] %s - retrying in 10s...", offer.tradeofferid, err);
+                logger.error("[%d] %s - retrying in 10s...", offer.tradeofferid, err.message);
 
                 if (!errorCount[offer.tradeofferid]) {
                     errorCount[offer.tradeofferid] = 1;
@@ -942,7 +942,7 @@ function getFamilyPIN(callback) {
         } else {
             offers.getFamilyCookie({"pin": result.pin}, function(err) {
                 if(err) {
-                    logger.warn("Error: " + err);
+                    logger.warn("Error: " + err.message);
                     getFamilyPIN(callback);
                 } else {
                     accountinfo.pin = result.pin;
