@@ -28,6 +28,7 @@
     * Windows 64-bit: https://bitbucket.org/srabouin/backpack.tf-automatic/downloads/backpack.tf-automatic-0.0.20-win-x64.zip
     * Windows 32-bit: https://bitbucket.org/srabouin/backpack.tf-automatic/downloads/backpack.tf-automatic-0.0.20-win-x86.zip
 * Double-click automatic.bat.
+* If you get an error and you've completed everything above, please try to restart your computer. Sometimes a reboot is necessary for node to function properly on certain systems.
 * Fill in the details. See the `Running the application` section below.
 
 #### Power Users ####
@@ -57,4 +58,3 @@ Restart your computer.
 
 * Please use the [issues](https://bitbucket.org/srabouin/backpack.tf-automatic/issues?status=new&status=open) section of this repo.
 * Ask the community for help on the [backpack.tf forums](http://forums.backpack.tf/index.php?/topic/20204-backpacktf-automatic-help-thread/). However, report bugs on the issue tracker (see above).
-
