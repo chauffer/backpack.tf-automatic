@@ -1,6 +1,6 @@
 {
   "name": "backpack.tf-automatic",
-  "version": "0.0.20",
+  "version": "0.0.21",
   "description": "Sell items automatically via backpack.tf Classifieds without running a Steam client.",
   "author": {
     "name": "Steve Rabouin",
