@@ -25,8 +25,8 @@
     * Windows 64-bit: http://www.microsoft.com/en-us/download/details.aspx?id=15336
     * Windows 32-bit: http://www.microsoft.com/en-us/download/details.aspx?id=29
 * [Download](https://bitbucket.org/srabouin/backpack.tf-automatic/downloads) the pre-packaged version (backpack.tf-automatic-x.x.x-win.zip) and *unpack it to a folder of your choice*, it will not work if you do not unpack it.
-    * Windows 64-bit: https://bitbucket.org/srabouin/backpack.tf-automatic/downloads/backpack.tf-automatic-0.0.20-win-x64.zip
-    * Windows 32-bit: https://bitbucket.org/srabouin/backpack.tf-automatic/downloads/backpack.tf-automatic-0.0.20-win-x86.zip
+    * Windows 64-bit: https://bitbucket.org/srabouin/backpack.tf-automatic/downloads/backpack.tf-automatic-0.0.21-win-x64.zip
+    * Windows 32-bit: https://bitbucket.org/srabouin/backpack.tf-automatic/downloads/backpack.tf-automatic-0.0.21-win-x86.zip
 * Double-click automatic.bat.
     * If you get an error and you've completed everything above, please try to restart your computer. Sometimes a reboot is necessary for node to function properly on certain systems.
 * Fill in the details. See the `Running the application` section below.
