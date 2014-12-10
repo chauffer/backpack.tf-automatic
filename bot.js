@@ -637,13 +637,13 @@ function processOffer(offer, mybackpack, theirbackpack) {
 
     theiritems.forEach(function (item) {
         // we don't want non-craftable items, unless it's a key, gg valf
-        if ((item.market_name != "Mann Co. Supply Crate Key") && (item.craftable === false)) {
+        if ((item.market_name != "Mann Co. Supply Crate Key" && item.market_name != "End of the Line Key") && (item.craftable === false)) {
             isValid = false;
         }
 
         // these are the only items we accept
         if (item.app_data.quality === ItemQualities.Unique) {
-            if (item.market_name === "Mann Co. Supply Crate Key") {
+            if (item.market_name === "Mann Co. Supply Crate Key" || item.market_name === "End of the Line Key") {
                 keys++;
             } else if (item.market_name === "Refined Metal") {
                 refined += 1;
