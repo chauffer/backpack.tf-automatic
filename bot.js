@@ -315,7 +315,7 @@ function webLogin(callback) {
     clearTimeout(heartbeattimer);
     client.webLogOn(function (data) {
         offers.setup({
-            "sessionID": sessionID, 
+            "sessionID": sessionID,
             "webCookie": data
         }, function() {
             offers.getAPIKey(function (err) {
@@ -449,8 +449,8 @@ function resolveOffers() {
 
 function loadPartnerInventory(offer) {
     offers.loadPartnerInventory({
-        "partnerSteamId": offer.steamid_other, 
-        "appId": 440, 
+        "partnerSteamId": offer.steamid_other,
+        "appId": 440,
         "contextId": 2,
         "tradeOfferId": offer.tradeofferid
     }, function (err, data) {
@@ -476,7 +476,7 @@ function loadPartnerInventory(offer) {
 
 function loadMyInventory(offer, theirbackpack) {
     offers.loadMyInventory({
-        "appId": 440, 
+        "appId": 440,
         "contextId": 2
     }, function (err, data) {
         if (data) {
@@ -767,7 +767,8 @@ function processOffer(offer, mybackpack, theirbackpack) {
 function acceptOffer(offer, message) {
     offers.acceptOffer({"tradeOfferId": offer.tradeofferid}, function (err) {
         if (err && err.message) {
-            var errorcode = err.message ? parseInt(err.message.match(/\d+/)[0]) || -1 : -1;
+            var errcodes = err.message.match(/\d+/),
+                errorcode = (errcodes ? parseInt(errcodes[0], 10) : -1) || -1;
 
             if (errorcode === 24 /* cookie expired/steamguard shit */ || errorcode === 28 /* family view probably */) {
                 logger.error("[%d] Error %d while accepting - refreshing web cookies...", offer.tradeofferid, errorcode);
