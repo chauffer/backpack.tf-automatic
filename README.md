@@ -16,8 +16,8 @@
 
 #### For the lazy - Windows only ####
 * Install [Node.js](http://nodejs.org)
-    * Windows 64-bit: http://nodejs.org/dist/v0.10.33/node-v0.10.33-x64.msi
-    * Windows 32-bit: http://nodejs.org/dist/v0.10.33/node-v0.10.33-x86.msi
+    * Windows 64-bit: http://nodejs.org/dist/v0.10.34/node-v0.10.34-x64.msi
+    * Windows 32-bit: http://nodejs.org/dist/v0.10.34/node-v0.10.34-x86.msi
 * Install [OpenSSL](http://slproweb.com/products/Win32OpenSSL.html) (Install the FULL version - links below). Ensure you allow the files to go in your system folder when prompted.
     * Windows 64-bit: http://slproweb.com/download/Win64OpenSSL-1_0_1j.exe
     * Windows 32-bit: http://slproweb.com/download/Win32OpenSSL-1_0_1j.exe
@@ -30,6 +30,7 @@
 * Double-click automatic.bat.
     * If you get an error and you've completed everything above, please try to restart your computer. Sometimes a reboot is necessary for node to function properly on certain systems.
 * Fill in the details. See the `Running the application` section below.
+* There is a [video](https://www.youtube.com/watch?v=ZjdxCJyORoE) available if you don't know what to do. If you're still having trouble, simple fixes to common errors are available below.
 
 #### Power Users ####
 * Install [Node.js](http://nodejs.org)
@@ -53,6 +54,12 @@ If you are running Windows, you probably didn't follow the steps above. Make sur
 
 #### 'node' is not recognized as an internal or external command, operable program or batch file ####
 Restart your computer.
+
+#### %1 is not a valid Win32 application.
+You need to install the proper versions for your Windows bitness (32 or 64 bit). So if you have a 32 bit Windows install, everything has to be 32 bit. If it's 64 bit, everything has to be 64 bit.
+
+#### Cannot find module '...' (commonly 'C:\Windows\system32\bot')
+Unzip the bot somewhere you like (such as your desktop folder).
 
 ### Who do I talk to if I run into problems, want to report a bug, or want to suggest features? ###
 
