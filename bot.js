@@ -156,6 +156,27 @@ if(settings.account && settings.account.accountName) {
     delete settings.account;
 }
 
+fs.watch("settings.json", (function () {
+    var change = 0;
+
+    return function (event) {
+        if (event === "change") {
+            if (change + 100 > Date.now()) {
+                return; // throttle
+            }
+
+            change = Date.now();
+
+            try {
+                settings = JSON.parse(fs.readFileSync("settings.json"));
+                logger.info("Settings reloaded.");
+            } catch (ex) {
+                logger.warn("Syntax error in settings.json, could not reload settings.");
+            }
+        }
+    };
+}()));
+
 logger.info("backpack.tf automatic v%s starting", appinfo.version);
 dateLog();
 
@@ -300,7 +321,7 @@ function login(delay) {
     } else {
         setupLogger();
 
-        logger.info("Connecting to Steam...");
+        logger.verbose("Connecting to Steam...");
         var logon = {accountName: accountinfo.username, password: accountinfo.password};
         if (settings.accounts[accountinfo.username] && settings.accounts[accountinfo.username].shaSentryfile) {
             logon.shaSentryfile = new Buffer(settings.accounts[accountinfo.username].shaSentryfile, "base64");
@@ -310,7 +331,7 @@ function login(delay) {
 }
 
 function webLogin(callback) {
-    logger.info("Connecting to Steam Web...");
+    logger.verbose("Connecting to Steam Web...");
     clearTimeout(getcounttimer);
     clearTimeout(heartbeattimer);
     client.webLogOn(function (data) {
@@ -319,7 +340,7 @@ function webLogin(callback) {
             "webCookie": data
         }, function() {
             offers.getAPIKey(function (err) {
-                if(err && err.message === 'Access Denied: Family View Enabled') {
+                if (err && err.message === 'Access Denied: Family View Enabled') {
                     if(accountinfo.pin) {
                         offers.getFamilyCookie({"pin": accountinfo.pin}, callback);
                     } else {
