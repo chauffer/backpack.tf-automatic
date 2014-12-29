@@ -263,7 +263,7 @@ function dateLog() {
     var text = moment().format("dddd, MMMM Do, YYYY");
     setTimeout(dateLog, moment().endOf("day").diff(moment()));
 
-    if (text != lastdatelog) {
+    if (text !== lastdatelog) {
         logger.info(text);
     }
 
@@ -271,6 +271,8 @@ function dateLog() {
 }
 
 client.on("error", function (e) {
+    var result;
+
     if (e.eresult === Steam.EResult.AccountLogonDenied) {
         prompt.get({
             properties: {
@@ -296,8 +298,8 @@ client.on("error", function (e) {
         logger.debug("Logged off from Steam. Trying again in 10s.");
         login(10);
     } else {
-        for (var result in Steam.EResult) {
-            if (Steam.EResult[result] == e.eresult) {
+        for (result in Steam.EResult) {
+            if (Steam.EResult[result] === e.eresult) {
                 logger.error("Steam error: " + result);
                 process.exit(2);
             }
@@ -373,7 +375,7 @@ function offerReady(callback) {
 
     logger.info("Offer handling ready.");
     heartbeat();
-    if(typeof callback == 'function'){
+    if (typeof callback === 'function') {
         callback();
     }
 }
@@ -422,7 +424,7 @@ function getOfferCount() {
     request({uri: uri, json: true}, function (err, response, body) {
         var resp = body && body.response;
 
-        if (response && response.statusCode && response.statusCode == 200 && resp) {
+        if (response && response.statusCode && response.statusCode === 200 && resp) {
             var pendingCount = resp.pending_received_count,
                 newCount = resp.new_received_count;
 
@@ -525,9 +527,9 @@ function checkOfferState(offer, callback) {
         "tradeofferid": offer.tradeofferid
     }, function (err, offerhist) {
         if (err) {
-            logger.debug("[%d] offers: failed to get offer data, retrying in 5s...", tradeofferid);
+            logger.debug("[%d] offers: failed to get offer data, retrying in 5s...", offer.tradeofferid);
             setTimeout(function() {
-                getOfferData(tradeofferid, callback);
+                checkOfferState(offer, callback);
             }, 5000);
         } else {
             if (offerhist.response.offer.trade_offer_state === TradeOffer.ETradeOfferStateAccepted) {
@@ -554,7 +556,7 @@ function checkOffer(offer) {
     if (offer.items_to_give !== undefined && offer.items_to_receive !== undefined) {
         // we only want to deal with TF2 offers
         var valid = offer.items_to_receive.every(function (item) {
-            return item.appid == 440;
+            return +item.appid === 440;
         });
 
         if (valid) {
@@ -658,7 +660,7 @@ function processOffer(offer, mybackpack, theirbackpack) {
 
     theiritems.forEach(function (item) {
         // we don't want non-craftable items, unless it's a key, gg valf
-        if ((item.market_name != "Mann Co. Supply Crate Key") && (item.craftable === false)) {
+        if ((item.market_name !== "Mann Co. Supply Crate Key") && (item.craftable === false)) {
             isValid = false;
         }
 
@@ -759,7 +761,7 @@ function processOffer(offer, mybackpack, theirbackpack) {
                             myearbuds === earbuds &&
                             mykeys === keys &&
                             body.response.store.length && // make sure the person asked for something else than metal
-                            body.response.store.length == (offer.items_to_give.length - changeitems) // matching number of items
+                            body.response.store.length === (offer.items_to_give.length - changeitems) // matching number of items
                         ) {
                         if (body.response.other && (body.response.other.scammer || body.response.other.banned)) {
                             logger.warn("[%d] %s is banned, declining trade offer...", offer.tradeofferid, offer.steamid_other);

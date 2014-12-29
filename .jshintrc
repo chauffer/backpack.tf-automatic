@@ -1,3 +1,19 @@
 {
+    "bitwise": false,
+    "eqeqeq": true,
+    "es3": false,
+    "forin": false,
+    "immed": true,
+    "indent": 2,
+    "latedef": "nofunc",
+    "noempty": true,
+    "nonew": true,
+    "undef": true,
+    "unused": false,
+    "trailing": true,
+    "boss": true,
+    "eqnull": true,
+    "evil": true,
+    "proto": true,
     "node": true
 }
