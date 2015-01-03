@@ -156,6 +156,27 @@ if(settings.account && settings.account.accountName) {
     delete settings.account;
 }
 
+fs.watch("settings.json", (function () {
+    var change = 0;
+
+    return function (event) {
+        if (event === "change") {
+            if (change + 100 > Date.now()) {
+                return; // throttle
+            }
+
+            change = Date.now();
+
+            try {
+                settings = JSON.parse(fs.readFileSync("settings.json"));
+                logger.info("Settings reloaded.");
+            } catch (ex) {
+                logger.warn("Syntax error in settings.json, could not reload settings.");
+            }
+        }
+    };
+}()));
+
 logger.info("backpack.tf automatic v%s starting", appinfo.version);
 dateLog();
 
@@ -242,7 +263,7 @@ function dateLog() {
     var text = moment().format("dddd, MMMM Do, YYYY");
     setTimeout(dateLog, moment().endOf("day").diff(moment()));
 
-    if (text != lastdatelog) {
+    if (text !== lastdatelog) {
         logger.info(text);
     }
 
@@ -250,6 +271,8 @@ function dateLog() {
 }
 
 client.on("error", function (e) {
+    var result;
+
     if (e.eresult === Steam.EResult.AccountLogonDenied) {
         prompt.get({
             properties: {
@@ -275,8 +298,8 @@ client.on("error", function (e) {
         logger.debug("Logged off from Steam. Trying again in 10s.");
         login(10);
     } else {
-        for (var result in Steam.EResult) {
-            if (Steam.EResult[result] == e.eresult) {
+        for (result in Steam.EResult) {
+            if (Steam.EResult[result] === e.eresult) {
                 logger.error("Steam error: " + result);
                 process.exit(2);
             }
@@ -300,7 +323,7 @@ function login(delay) {
     } else {
         setupLogger();
 
-        logger.info("Connecting to Steam...");
+        logger.verbose("Connecting to Steam...");
         var logon = {accountName: accountinfo.username, password: accountinfo.password};
         if (settings.accounts[accountinfo.username] && settings.accounts[accountinfo.username].shaSentryfile) {
             logon.shaSentryfile = new Buffer(settings.accounts[accountinfo.username].shaSentryfile, "base64");
@@ -310,16 +333,16 @@ function login(delay) {
 }
 
 function webLogin(callback) {
-    logger.info("Connecting to Steam Web...");
+    logger.verbose("Connecting to Steam Web...");
     clearTimeout(getcounttimer);
     clearTimeout(heartbeattimer);
     client.webLogOn(function (data) {
         offers.setup({
-            "sessionID": sessionID, 
+            "sessionID": sessionID,
             "webCookie": data
         }, function() {
             offers.getAPIKey(function (err) {
-                if(err && err.message === 'Access Denied: Family View Enabled') {
+                if (err && err.message === 'Access Denied: Family View Enabled') {
                     if(accountinfo.pin) {
                         offers.getFamilyCookie({"pin": accountinfo.pin}, callback);
                     } else {
@@ -352,7 +375,7 @@ function offerReady(callback) {
 
     logger.info("Offer handling ready.");
     heartbeat();
-    if(typeof callback == 'function'){
+    if (typeof callback === 'function') {
         callback();
     }
 }
@@ -401,7 +424,7 @@ function getOfferCount() {
     request({uri: uri, json: true}, function (err, response, body) {
         var resp = body && body.response;
 
-        if (response && response.statusCode && response.statusCode == 200 && resp) {
+        if (response && response.statusCode && response.statusCode === 200 && resp) {
             var pendingCount = resp.pending_received_count,
                 newCount = resp.new_received_count;
 
@@ -449,8 +472,8 @@ function resolveOffers() {
 
 function loadPartnerInventory(offer) {
     offers.loadPartnerInventory({
-        "partnerSteamId": offer.steamid_other, 
-        "appId": 440, 
+        "partnerSteamId": offer.steamid_other,
+        "appId": 440,
         "contextId": 2,
         "tradeOfferId": offer.tradeofferid
     }, function (err, data) {
@@ -476,7 +499,7 @@ function loadPartnerInventory(offer) {
 
 function loadMyInventory(offer, theirbackpack) {
     offers.loadMyInventory({
-        "appId": 440, 
+        "appId": 440,
         "contextId": 2
     }, function (err, data) {
         if (data) {
@@ -504,9 +527,9 @@ function checkOfferState(offer, callback) {
         "tradeofferid": offer.tradeofferid
     }, function (err, offerhist) {
         if (err) {
-            logger.debug("[%d] offers: failed to get offer data, retrying in 5s...", tradeofferid);
+            logger.debug("[%d] offers: failed to get offer data, retrying in 5s...", offer.tradeofferid);
             setTimeout(function() {
-                getOfferData(tradeofferid, callback);
+                checkOfferState(offer, callback);
             }, 5000);
         } else {
             if (offerhist.response.offer.trade_offer_state === TradeOffer.ETradeOfferStateAccepted) {
@@ -533,7 +556,7 @@ function checkOffer(offer) {
     if (offer.items_to_give !== undefined && offer.items_to_receive !== undefined) {
         // we only want to deal with TF2 offers
         var valid = offer.items_to_receive.every(function (item) {
-            return item.appid == 440;
+            return +item.appid === 440;
         });
 
         if (valid) {
@@ -637,7 +660,7 @@ function processOffer(offer, mybackpack, theirbackpack) {
 
     theiritems.forEach(function (item) {
         // we don't want non-craftable items, unless it's a key, gg valf
-        if ((item.market_name != "Mann Co. Supply Crate Key" && item.market_name != "End of the Line Key") && (item.craftable === false)) {
+        if ((item.market_name !== "Mann Co. Supply Crate Key" && item.market_name !== "End of the Line Key") && (item.craftable === false)) {
             isValid = false;
         }
 
@@ -738,7 +761,7 @@ function processOffer(offer, mybackpack, theirbackpack) {
                             myearbuds <= earbuds &&
                             mykeys <= keys &&
                             body.response.store.length && // make sure the person asked for something else than metal
-                            body.response.store.length == (offer.items_to_give.length - changeitems) // matching number of items
+                            body.response.store.length === (offer.items_to_give.length - changeitems) // matching number of items
                         ) {
                         if (body.response.other && (body.response.other.scammer || body.response.other.banned)) {
                             logger.warn("[%d] %s is banned, declining trade offer...", offer.tradeofferid, offer.steamid_other);
@@ -767,7 +790,8 @@ function processOffer(offer, mybackpack, theirbackpack) {
 function acceptOffer(offer, message) {
     offers.acceptOffer({"tradeOfferId": offer.tradeofferid}, function (err) {
         if (err && err.message) {
-            var errorcode = err.message ? parseInt(err.message.match(/\d+/)[0]) || -1 : -1;
+            var errcodes = err.message.match(/\d+/),
+                errorcode = (errcodes ? parseInt(errcodes[0], 10) : -1) || -1;
 
             if (errorcode === 24 /* cookie expired/steamguard shit */ || errorcode === 28 /* family view probably */) {
                 logger.error("[%d] Error %d while accepting - refreshing web cookies...", offer.tradeofferid, errorcode);
