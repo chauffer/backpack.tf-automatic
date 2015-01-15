@@ -1,6 +1,6 @@
 {
   "name": "backpack.tf-automatic",
-  "version": "0.0.21",
+  "version": "0.0.21-chauffer",
   "description": "Sell items automatically via backpack.tf Classifieds without running a Steam client.",
   "author": {
     "name": "Steve Rabouin",
@@ -9,7 +9,7 @@
   "main": "./bot.js",
   "repository": {
     "type": "git",
-    "url": "https://bitbucket.org/srabouin/backpack.tf-automatic.git"
+    "url": "https://github.com/chauffer/backpack.tf-automatic.git"
   },
   "dependencies": {
     "steam": ">= 0.6.7",
