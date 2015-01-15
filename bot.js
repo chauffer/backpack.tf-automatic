@@ -878,10 +878,8 @@ function offerAccepted(offer, message) {
         form: {
             method: "completed",
             steamid: client.steamID,
-            version: appinfo.version,
             token: settings.accounts[accountinfo.username].token,
             offer: offer,
-            message: message
         },
         method: "POST"
     };
@@ -902,7 +900,6 @@ function heartbeat() {
             uri: backpackurl + "/api/IAutomatic/IHeartBeat/",
             form: {
                 method: "alive",
-                version: appinfo.version,
                 steamid: client.steamID,
                 token: settings.accounts[accountinfo.username].token
             },
