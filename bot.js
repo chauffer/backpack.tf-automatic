@@ -21,7 +21,7 @@ var errorCount = {};
 var processing = {};
 var backpackurl = "http://backpack.tf";
 var tokenvalidated = false;
-var lastcount = 0;
+var lastcount = -1;
 var logger;
 
 var TradeOffer = {
@@ -428,6 +428,12 @@ function getOfferCount() {
             var pendingCount = resp.pending_received_count,
                 newCount = resp.new_received_count;
 
+            if(newCount == 0 && lastcount != -1)
+            {
+                getOfferCountTimer();
+                return;
+            }
+
             logger.debug('offers: ' + pendingCount + ' pending, ' + newCount + ' new received.');
 
             if (pendingCount > lastcount || newCount) {
@@ -436,11 +442,15 @@ function getOfferCount() {
 
             lastcount = pendingCount;
         }
-
-        getcounttimer = setTimeout(function () {
-            getOfferCount();
-        }, 60000);
+        getOfferCountTimer();
     });
+}
+
+function getOfferCountTimer()
+{
+    getcounttimer = setTimeout(function () {
+        getOfferCount();
+    }, 60000);
 }
 
 function resolveOffers() {
@@ -904,7 +914,7 @@ function heartbeat() {
                 if (body.success) {
                     // every 5 minutes should be sufficient
                     heartbeattimer = setTimeout(heartbeat, 60000 * 5);
-                    logger.debug("Heartbeat sent to backpack.tf");
+                    //logger.debug("Heartbeat sent to backpack.tf"); who cares
                     tokenvalidated = true;
                     getOfferCount();
                 } else {
