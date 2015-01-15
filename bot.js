@@ -586,6 +586,8 @@ function processOffer(offer, mybackpack, theirbackpack) {
         myitemids = [],
         isValid = true,
         refined = 0,
+        mymetalcurrency = 0,
+        metalcurrency = 0,
         keys = 0,
         earbuds = 0,
         mykeys = 0,
@@ -679,11 +681,11 @@ function processOffer(offer, mybackpack, theirbackpack) {
             if (item.market_name === "Mann Co. Supply Crate Key" || item.market_name === "End of the Line Key") {
                 keys++;
             } else if (item.market_name === "Refined Metal") {
-                refined += 1;
+                metalcurrency += 2 * 3 * 3;
             } else if (item.market_name === "Reclaimed Metal") {
-                refined += 1 / 3;
+                metalcurrency += 2 * 3;
             } else if (item.market_name === "Scrap Metal") {
-                refined += 1 / 9;
+                metalcurrency += 2;
             } else if (item.market_name === "Earbuds") {
                 // we don't want gifted earbuds
                 if (item.gifted === true) {
@@ -696,7 +698,7 @@ function processOffer(offer, mybackpack, theirbackpack) {
                 item.tags.forEach(function (tag) {
                     if (tag.category === "Type" && ["secondary", "primary", "pda2", "building", "melee"].indexOf(tag.internal_name) !== -1) {
                         isValid = true;
-                        refined += 1 / 18;
+                        metalcurrency += 1;
                     }
                 });
             } else {
@@ -738,13 +740,15 @@ function processOffer(offer, mybackpack, theirbackpack) {
                             } else if (index === "earbuds") {
                                 myearbuds += count;
                             } else if (index === "metal") {
-                                myrefined += count;
+                                mymetalcurrency += Math.ceil(count * 18);
                             }
                         }
                     });
 
-                    refined = Math.floor(Math.round(refined * 18) / 18 * 100) / 100;
-                    myrefined = Math.floor(Math.round(myrefined * 18) / 18 * 100) / 100;
+                if(mymetalcurrency > 0)
+                    myrefined = Number( ( mymetalcurrency / 18 ).toFixed( 2 ) );
+                if(metalcurrency > 0)
+                    refined =  Number( ( metalcurrency / 18 ).toFixed( 2 ) );
 
                     var combinednames = [];
                     for (var key in itemnames) {
@@ -767,7 +771,7 @@ function processOffer(offer, mybackpack, theirbackpack) {
                     logger.info("[%d] %s", offer.tradeofferid, message);
 
                     if (
-                            myrefined <= refined && // matching currencies
+                            mymetalcurrency <= metalcurrency && // matching currencies
                             myearbuds <= earbuds &&
                             mykeys <= keys &&
                             body.response.store.length && // make sure the person asked for something else than metal
