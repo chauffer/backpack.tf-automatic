@@ -543,7 +543,7 @@ function checkOfferState(offer, callback) {
             }, 5000);
         } else {
             if (offerhist.response.offer.trade_offer_state === TradeOffer.ETradeOfferStateAccepted) {
-                logger.verbose("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Offer accepted elsewhere, ignorning.", offer.tradeofferid);
+                logger.verbose("[" + offer.tradeofferid + "/" + offer.steamid_other + "] Offer accepted elsewhere, ignoring.", offer.tradeofferid);
                 delete processing[offer.tradeofferid];
             } else if (offerhist.response.offer.trade_offer_state === TradeOffer.ETradeOfferStateInvalidItems) {
                 discardOffer(offer);
