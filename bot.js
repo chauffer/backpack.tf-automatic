@@ -647,11 +647,11 @@ function processOffer(offer, mybackpack, theirbackpack) {
         // these are the only items we give back as change
         if (item.app_data.quality === ItemQualities.Unique) {
             if (item.market_name === "Refined Metal") {
-                myrefined += 1;
+                mymetalcurrency += 2 * 3 * 3;
             } else if (item.market_name === "Reclaimed Metal") {
-                myrefined += 1 / 3;
+                mymetalcurrency += 2 * 3;
             } else if (item.market_name === "Scrap Metal") {
-                myrefined += 1 / 9;
+                mymetalcurrency += 2;
             } else {
                 isChange = false;
             }
